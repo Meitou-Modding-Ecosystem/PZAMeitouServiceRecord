@@ -1,0 +1,3 @@
+# PZA's Service Record for Meitou: the Meitou version's own lines (ja). Author: PZA. Same format as lang/ja.txt.
+meitou.help.command = 指揮系統：役職と上下関係は PZA Military Manager で決めます。Meitou 版にはまだそのウィンドウがありません。セーブに既にある役職は「戦士」ページと、「分隊」ページの名前の後ろに表示されます。
+meitou.help.language = 言語：ウィンドウは Meitou 自身の言語（英語・ロシア語・中国語・日本語）に従います。Meitou の Settings > Mods ページの Language 設定で別の言語を選べます。変更はゲームの再起動後に反映されます。戦闘後レポートは今のところ英語のみです。

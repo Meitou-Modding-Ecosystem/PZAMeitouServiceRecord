@@ -1,0 +1,3 @@
+# PZA's Service Record for Meitou: the Meitou version's own lines (ru). Author: PZA. Same format as lang/ru.txt.
+meitou.help.command = ЦЕПОЧКА КОМАНДОВАНИЯ: должности и подчинение задаются в PZA Military Manager. Его окна в версии для Meitou пока нет. Должности, уже записанные в сохранении, видны на странице «Боец» и после имени на странице «Отряд».
+meitou.help.language = Язык: окно следует языку самого Meitou (английский, русский, китайский или японский); другой язык выбирает настройка Language на странице Settings > Mods в Meitou. Изменение вступает в силу после перезапуска игры. Отчёты после боя пока на английском.
