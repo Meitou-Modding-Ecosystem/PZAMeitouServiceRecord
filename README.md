@@ -42,6 +42,12 @@ Known limits:
 - The Military Manager (Shift+M, the chain of command) of the RE_Kenshi version is not in this build yet.
 - Texts in English, Russian, Chinese and Japanese (machine translations, not yet checked by native speakers).
 
+## Planned
+Ideas, no dates:
+- **The Military Manager** from the RE_Kenshi version: your own chain of command (Commander-in-Chief, Generals, Captains, Sergeants), post
+  marks on the portraits, bodyguard orders down the chain, and one-press Auto-Organize by merit.
+- **Specialties** (a Combat Medic, a Ranger...) and a **sparring organiser** for training.
+
 ## Reporting a bug
 What happened (for a wrong count: who hit whom, how, and what the record says), how to make it happen again, your Meitou version and mod
 list, and Meitou's `log.txt` (in your Meitou folder) copied right after that session. Our lines start with `PZA's Service Record:`. Post it
