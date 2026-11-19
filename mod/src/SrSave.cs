@@ -94,9 +94,40 @@ public static class SrSave
             s.SetBaselineToNow();
             Interlocked.Increment(ref BaselinesSet);
         }
-        if (str.TryGetValue("pza_biggest_on", out var on)) s.BiggestOn = on;
+        if (str.TryGetValue("pza_biggest_on", out var on)) s.BiggestOn = on.Length > 200 ? on[..200] : on;
+        if (Sanitize(s) is { Length: > 0 } fixedWhat)
+        {
+            Interlocked.Increment(ref Corrected);
+            SrLog.Line($"saved record of {name}: corrected out-of-range values ({fixedWhat}); a broken or edited save");
+        }
         Interlocked.Increment(ref Loads);
         return s;
+    }
+
+    /// <summary>Records loaded with an out-of-range value corrected (fuzz 2026-11-18).</summary>
+    public static long Corrected;
+
+    /// <summary>A save is outside data: NaN, infinite, negative or huge values (a broken or hand-edited save, another tool) become 0 or the nearest
+    /// sane value, so no report prints NaN and no count runs backwards. The mod itself never writes such values. Returns what was corrected.</summary>
+    public static string Sanitize(Stats s)
+    {
+        var what = new List<string>();
+        double D(double v, string n) { if (double.IsFinite(v) && v >= 0 && v <= 1e12) return v; what.Add(n); return 0; }
+        int C(int v, string n) { if (v >= 0 && v <= 100_000_000) return v; what.Add(n); return v < 0 ? 0 : 100_000_000; }
+        s.Dealt = D(s.Dealt, "dealt"); s.Taken = D(s.Taken, "taken"); s.Biggest = (float)D(s.Biggest, "biggest"); s.FfDamage = D(s.FfDamage, "ff damage");
+        s.OneHitKO = C(s.OneHitKO, "1-hit KOs"); s.OneHitKill = C(s.OneHitKill, "1-hit kills"); s.KosSuffered = C(s.KosSuffered, "KOs suffered");
+        s.TimesKO = C(s.TimesKO, "times KO"); s.LimbsLost = C(s.LimbsLost, "limbs lost"); s.Kills = C(s.Kills, "kills"); s.KosDealt = C(s.KosDealt, "KOs dealt");
+        s.LimbsRemoved = C(s.LimbsRemoved, "limbs removed"); s.FfHits = C(s.FfHits, "ff hits"); s.FfKOs = C(s.FfKOs, "ff KOs"); s.FfLimbs = C(s.FfLimbs, "ff limbs");
+        s.Fights = C(s.Fights, "fights");
+        if (s.Biggest > s.Dealt) { s.Biggest = (float)s.Dealt; what.Add("biggest above dealt"); }
+        // the fight baseline is part of the record: never above it, never negative
+        double bd = Math.Min(D(s.BDealt, "baseline"), s.Dealt);
+        int B(int v, int max) => Math.Clamp(v, 0, max);
+        int[] before = [s.BKills, s.BKOs, s.BLimbs, s.B1KO, s.B1Kill];
+        (s.BKills, s.BKOs, s.BLimbs, s.B1KO, s.B1Kill) = (B(s.BKills, s.Kills), B(s.BKOs, s.KosDealt), B(s.BLimbs, s.LimbsRemoved), B(s.B1KO, s.OneHitKO), B(s.B1Kill, s.OneHitKill));
+        if (bd != s.BDealt || !before.SequenceEqual([s.BKills, s.BKOs, s.BLimbs, s.B1KO, s.B1Kill])) what.Add("fight baseline");
+        s.BDealt = bd;
+        return string.Join(", ", what.Distinct());
     }
 
     #endregion

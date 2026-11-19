@@ -4,12 +4,14 @@
 #   .\build.ps1 -Check     also the offline check: the differential replay (random event traces through the RE_Kenshi plugin's own C++ core,
 #                          built with its VS2010 compiler by tools\diff\build_diff.bat, and through this C# port; results compared byte for
 #                          byte), on a copy of the .NET 11 runtime inside the Meitou release. It never starts the game.
+#   .\build.ps1 -Fuzz      also run the fuzz harness (tests\fuzz); -Check runs it too (2026-11-18)
 #   -Seeds <n>             how many traces (default 12, 4000 events each, the last third with hostile readings)
 #   -MeitouDir <dir>       the unpacked Meitou release (default: MeitouDir in mod\local.props, git-ignored)
 #
 # It installs nothing. out\ is git-ignored.
 param(
     [switch]$Check,
+    [switch]$Fuzz,
     [int]$Seeds = 12,
     [string]$MeitouDir = ""
 )
@@ -80,4 +82,12 @@ if ($Check) {
     Push-Location $rt
     try { & dotnet exec --runtimeconfig check.runtimeconfig.json check.dll $diff $stage "C:\Program Files (x86)\Steam\steamapps\common\Kenshi" } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw "check FAILED ($LASTEXITCODE)" }
+}
+
+# 2026-11-18: the fuzz harness (tests\fuzz, PZA's Meitou UI fuzz kit) on the same Meitou release: -Fuzz runs it, and so does every -Check
+# (a release also needs the mutation check, PZAMeitouUi\fuzz\mutate.py). It never starts the game.
+if ($Fuzz -or $Check) {
+    $fuzzRunner = Join-Path $here "..\..\PZAMeitouUi\fuzz\run_fuzz.ps1"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $fuzzRunner -Repo (Join-Path $here "..") -MeitouDir $MeitouDir
+    if ($LASTEXITCODE -ne 0) { throw "fuzz FAILED ($LASTEXITCODE): report in tests\out\fuzz\fuzz-report.txt" }
 }

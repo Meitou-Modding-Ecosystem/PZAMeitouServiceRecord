@@ -29,7 +29,14 @@ public sealed class SrArchive
             s.Append(piece);
         }
         string r = s.ToString().TrimEnd(' ', '.').TrimStart(' ');
-        return r.Length == 0 ? "Unknown faction" : r;
+        if (r.Length == 0) return "Unknown faction";
+        // fuzz 2026-11-18: a faction called CON, NUL, COM1, LPT1... named a Windows device, not a file (the report went nowhere)
+        string stem = r.Split('.')[0].TrimEnd(' ').ToUpperInvariant();
+        bool device = stem is "CON" or "PRN" or "AUX" or "NUL" or "CONIN$" or "CONOUT$"
+            || stem.Length == 4 && (stem.StartsWith("COM", StringComparison.Ordinal) || stem.StartsWith("LPT", StringComparison.Ordinal)) && char.IsDigit(stem[3]);
+        if (!device) return r;
+        int dot = r.IndexOf('.');   // Windows matches the device before the first dot whatever follows: "NUL.txt" is NUL too
+        return dot < 0 ? r + "_" : r[..dot].TrimEnd(' ') + "_" + r[dot..];
     }
 
     public static string DefaultDir()

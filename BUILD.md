@@ -2,11 +2,11 @@
 
 Author: PZA. Licence: GNU GPL version 3 or later (`LICENSE`).
 
-This is the source of PZA's Service Record for Meitou 0.1.1 (beta, commit `a932e68` of the development repository). Each release also carries a `-source.zip` with everything the DLL is built from, the shared code included.
+This is the source of PZA's Service Record for Meitou 0.1.2 (beta, commit `e609f7b` of the development repository). Each release also carries a `-source.zip` with everything the DLL is built from, the shared code included.
 
 You need:
 - the .NET SDK (10 or newer)
-- an unpacked Meitou release (0.20.1 or 0.21.x, win-x64)
+- an unpacked Meitou release (0.20.1 or newer, win-x64)
 - PZA's Meitou UI 0.3.1 beside this folder (`..\PZAMeitouUi\src`; its code is compiled in), also in the source zip
 - the RE_Kenshi plugin's data mod and language files (`PZAServiceRecord\dist\`), also in the source zip
 
