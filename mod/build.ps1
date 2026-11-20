@@ -7,13 +7,17 @@
 #   .\build.ps1 -Fuzz      also run the fuzz harness (tests\fuzz); -Check runs it too (2026-11-18)
 #   -Seeds <n>             how many traces (default 12, 4000 events each, the last third with hostile readings)
 #   -MeitouDir <dir>       the unpacked Meitou release (default: MeitouDir in mod\local.props, git-ignored)
+#   -RunOn <dir>           run the -Check on ANOTHER Meitou release's runtime and assemblies, with the mod still built against -MeitouDir
+#                          (0.20.1, what ships): a 0.20.1 build on 0.21 / 0.22 is how players run it (2026-11-19: Meitou 0.21 changed
+#                          UiListItem's constructor and every 0.20.1-built PZA window list threw there; a same-version check never saw it)
 #
 # It installs nothing. out\ is git-ignored.
 param(
     [switch]$Check,
     [switch]$Fuzz,
     [int]$Seeds = 12,
-    [string]$MeitouDir = ""
+    [string]$MeitouDir = "",
+    [string]$RunOn = ""
 )
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -67,13 +71,17 @@ if ($Check) {
     & $exe short (Join-Path $diff "short.txt")
     if ($LASTEXITCODE -ne 0) { throw "sr_diff short failed" }
 
+    $runDir = if ($RunOn -ne "") { [System.IO.Path]::GetFullPath($RunOn) } else { $MeitouDir }
+    if (-not (Test-Path (Join-Path $runDir "MeitouClient.dll"))) { throw "MeitouClient.dll not found in $runDir" }
+    Write-Host "check: the mod built against $MeitouDir, run on $runDir"
     $rt = Join-Path $here "out\checkrt"
+    if (Test-Path $rt) { Remove-Item -Recurse -Force $rt }
     New-Item -ItemType Directory -Force $rt | Out-Null
     $patterns = "System*.dll", "Microsoft.*.dll", "mscorlib.dll", "netstandard.dll", "WindowsBase.dll", "coreclr.dll", "clrjit.dll",
                 "clrgc.dll", "hostfxr.dll", "hostpolicy.dll", "Meitou*.dll", "0Harmony.dll", "Bepu*.dll", "DotRecast*.dll", "Stb*.dll"
-    foreach ($p in $patterns) { Copy-Item (Join-Path $MeitouDir $p) $rt -Force }
+    foreach ($p in $patterns) { Copy-Item (Join-Path $runDir $p) $rt -Force }
     $stagedDll = Join-Path $stage "PZAServiceRecord.Meitou.dll"
-    & dotnet build (Join-Path $here "tools\check\check.csproj") -c Release -nologo "-p:MeitouDir=$MeitouDir" "-p:ModDll=$stagedDll" -o (Join-Path $here "out\checkbin")
+    & dotnet build (Join-Path $here "tools\check\check.csproj") -c Release -nologo "-p:MeitouDir=$runDir" "-p:ModDll=$stagedDll" -o (Join-Path $here "out\checkbin")
     if ($LASTEXITCODE -ne 0) { throw "check tool build failed ($LASTEXITCODE)" }
     Copy-Item (Join-Path $here "out\checkbin\check.dll") $rt -Force
     Copy-Item $stagedDll $rt -Force

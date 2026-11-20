@@ -1,4 +1,4 @@
-# PZA's Service Record for Meitou (beta 0.1.2)
+# PZA's Service Record for Meitou (beta 0.1.3)
 
 Every fighter keeps a service record: kills, knockouts, one-hit knockouts, limbs taken and lost, damage dealt and taken, biggest hits, and a
 radar chart of their fighting style. After a big fight you get an **After-Action Report** with advice on what to keep and what to improve.
@@ -29,7 +29,7 @@ Plain R stays Meitou's. Nothing fires while you type in a text box.
 **Meitou 0.20.1 and newer.** Checked on Meitou 0.20.1, 0.21.0 and 0.22.1; there is no upper version cap any more, so a newer Meitou no longer refuses it.
 
 ## Install
-- Unpack `PZAServiceRecord.Meitou-0.1.2-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAServiceRecord\`), then tick
+- Unpack `PZAServiceRecord.Meitou-0.1.3-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAServiceRecord\`), then tick
   **PZAServiceRecord** in Meitou's mod list. If you also use PZA's Service Record for RE_Kenshi, it is the same folder on purpose: each game
   loads only its own file.
 - No items or world data; load order doesn't matter. You can remove it at any time; whether the records come back after saving without it has not been tried yet.
