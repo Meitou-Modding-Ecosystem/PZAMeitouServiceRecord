@@ -41,7 +41,7 @@ public sealed class SrSystem : ICombatHitObserver
     public void HitResolved(World world, in CombatHit hit)
     {
         if (!Active) return;
-        s_world = world;
+        FollowWorld(world);
         var b = SrBridge.TakeBefore(hit.Victim.Slot, world.Tick);
         var before = b?.Snap ?? default;
         var victimCold = SrBridge.Cold(world, hit.Victim);
@@ -103,6 +103,7 @@ public sealed class SrSystem : ICombatHitObserver
     /// <summary>A stealth knockout landed (the bridge's Strike postfix).</summary>
     public static void StealthKO(World world, CharacterId attacker, CharacterId victim)
     {
+        FollowWorld(world);
         lock (Lock)
         {
             ulong a = SrBridge.Key(attacker), v = SrBridge.Key(victim);
@@ -112,6 +113,56 @@ public sealed class SrSystem : ICombatHitObserver
             Hang(a, ac);
         }
     }
+
+    #endregion
+
+    #region The world
+
+    /// <summary>Worlds the system has started clean (the counters line's "worlds").</summary>
+    public static long WorldsFollowed;
+
+    /// <summary>
+    /// Meitou builds a new world for every new game and load. The first call from a world not seen before starts it clean (0.1.5): the
+    /// core's records, its clock and the reports' open fight belong to the world that ended. Records are keyed by slot and generation, so a
+    /// record kept would hang on the new world's character in the same slot (the plugin drops a record left at an address that loads without
+    /// one, its loadsCleared). The saved records come back with their characters (EnsureLoaded / Hang). Not IDisposable: Meitou disposes the
+    /// old world's systems only after the new world is read and ready (findings F175).
+    /// </summary>
+    static void FollowWorld(World world)
+    {
+        if (ReferenceEquals(world, s_seen)) return;
+        Follow(world, world.Tick);
+        s_world = world;
+    }
+
+    /// <summary>The world last seen, by identity only (any object, so the fuzz harness can stand in for worlds).</summary>
+    static object? s_seen;
+
+    /// <summary>
+    /// <see cref="FollowWorld"/>'s rule: a world (<paramref name="world"/>, at <paramref name="tick"/>) other than the last one seen clears the
+    /// last one's state; the first world clears nothing.
+    /// </summary>
+    static void Follow(object world, long tick)
+    {
+        lock (Lock)
+        {
+            if (ReferenceEquals(world, s_seen)) return;
+            bool first = s_seen is null;
+            s_seen = world;
+            if (first) return;
+
+            int records = Core.StatsCount;
+            Core.ClearAll();
+            s_now = tick / TicksPerSecond;
+            SrReports.NewWorld();
+            SrWindow.NewWorld();
+            WorldsFollowed++;
+            SrLog.Line($"a new world (new game or load): {records} records of the last one dropped; the saved ones come back with their characters");
+        }
+    }
+
+    /// <summary>For the fuzz harness: the world change without a running game (any object stands for a world).</summary>
+    public static void FollowForCheck(object world, long tick) => Follow(world, tick);
 
     #endregion
 
@@ -148,7 +199,7 @@ public sealed class SrSystem : ICombatHitObserver
     public void SlowWorld(World world)
     {
         if (!Active) return;
-        s_world = world;
+        FollowWorld(world);
         double now = world.Tick / TicksPerSecond;
         if (now > s_now) s_now = now;
         lock (Lock)
@@ -194,7 +245,7 @@ public sealed class SrSystem : ICombatHitObserver
                 $"attached {Attached} replaced {Replaced} uiLines {UiLines} | kcImports {SrSave.KcImports} kcSkipped {SrSave.KcSkipped} " +
                 $"stealthTries {SrBridge.StealthTries} landed {SrBridge.StealthLanded} beforeMisses {SrBridge.BeforeMisses} allyFaults {SrBridge.AllyFaults} " +
                 $"leaderFaults {SrBridge.LeaderFaults} baselines {SrSave.BaselinesSet} | maps stats {Core.StatsCount} victims {Core.VictimCount} " +
-                $"pending {Core.PendingCount} track {Core.TrackCount}");
+                $"pending {Core.PendingCount} track {Core.TrackCount} | commandsRead {SrSave.CommandsRead} commandsWritten {SrSave.CommandsWritten}");
         }
         if (!force && line == s_lastCounterLine) return;
         s_lastCounterLine = line;
@@ -211,10 +262,14 @@ public sealed class SrSystem : ICombatHitObserver
     {
         if (s_world is not { } w) return;
         SrReports.OnEvent(w, kind, attacker, victim, value, s_now);   // the plugin: g_aar.onEvent and the Recent page, before the log
-        if (!Settings.EventLog) return;
-        EventLines++;
+        bool corpus = Settings.HitLog && kind != "biggest";
+        if (!corpus && !Settings.EventLog) return;
         string a = attacker != 0 ? SrBridge.Cold(w, SrBridge.IdOf(attacker))?.Name ?? "?" : "-";
         string v = victim != 0 ? SrBridge.Cold(w, SrBridge.IdOf(victim))?.Name ?? "?" : "-";
+        // 0.1.4: the plugin's v0.4.1 corpus line, every judged event with ids (kills, KOs, limbs, wounds...), keys as the "aar hit" line's
+        if (corpus) SrLog.Line(string.Create(CultureInfo.InvariantCulture, $"aar ev={kind} t={s_now:0.00} a={attacker:x}|{a} v={victim:x}|{v} x={value:0.0}"));
+        if (!Settings.EventLog) return;
+        EventLines++;
         string line = kind switch
         {
             "biggest" => string.Create(CultureInfo.InvariantCulture, $"event biggest: {a} hit {v} for {value:0.0}"),

@@ -43,10 +43,38 @@ public static class SrWindow
         {
             if (list.Count >= 512) break;
             if (SrBridge.Cold(world, SrBridge.IdOf(key)) is not { IsPlayer: true } c || SrSystem.Core.Find(key) is not { } s) continue;
-            list.Add(new Person { Key = key, Name = c.Name, S = s.Clone(), Animal = global::Meitou.Simulation.Factions.SquadRegistry.IsAnimal(c) });
+            list.Add(new Person { Key = key, Name = c.Name, S = s.Clone(), Animal = global::Meitou.Simulation.Factions.SquadRegistry.IsAnimal(c),
+                Post = SrSave.CommandOf(c.Stats)?.PostNumber ?? 0 });
         }
         s_squad = [.. list.OrderBy(p => p.Name, StringComparer.Ordinal)];
+        // 0.1.4: the Fighter page's own character, record or not (a fresh one is in no list above): its name and post
+        ulong want = s_fighter;
+        s_shown = want != 0 && SrBridge.Cold(world, SrBridge.IdOf(want)) is { } f ? new Shown(want, f.Name, SrSave.CommandOf(f.Stats)?.PostNumber ?? 0) : null;
     }
+
+    /// <summary>A new world (new game or load, 0.1.5; under SrSystem.Lock): the squad list and the Fighter page's character are ids of the
+    /// world that ended, so they go; the pages are built again.</summary>
+    public static void NewWorld()
+    {
+        s_squad = [];
+        s_shown = null;
+        s_fighter = 0;
+        s_dirty = true;
+    }
+
+    /// <summary>The Fighter page's character as the tick last saw it (any character, with a record or not).</summary>
+    sealed record Shown(ulong Key, string Name, int Post);
+
+    static volatile Shown? s_shown;
+
+    /// <summary>For the offline check: the Fighter page's character without a world.</summary>
+    public static void SetShownForCheck(ulong key, string name, int post) => s_shown = new Shown(key, name, post);
+
+    /// <summary>For the offline check: the Fighter page on <paramref name="key"/> (as STA does with a selected character).</summary>
+    public static void SelectFighterForCheck(ulong key) { s_fighter = key; s_dirty = true; }
+
+    /// <summary>For the offline check: the next bind puts the kept page back again (as a restart does).</summary>
+    public static void ResetTabForCheck() { s_tabRestored = false; s_tabBroken = false; }
 
     /// <summary>For the offline check: a squad without a world.</summary>
     public static void SetSquadForCheck(List<Person> squad) => s_squad = [.. squad.OrderBy(p => p.Name, StringComparer.Ordinal)];
@@ -88,13 +116,17 @@ public static class SrWindow
     // Top: a page's top margin. PZA's Meitou UI 0.3.0 puts every tab page below its tab strip itself (the old 0.075 made a second gap).
     const double Top = 0.01, RadarX = 0.60, RadarY = 0.09, RadarW = 0.32;
 
+    /// <summary>0.1.4 (the user's screenshot, 2026-11-21): the list was 0.55 wide and "First strike" / "Endurance" ran into it. The left
+    /// labels end at the hexagon's side (about 0.644) and need about 0.11: the list now ends at 0.49 and the label boxes start after it.</summary>
+    const double FighterListW = 0.47, LabelGap = 0.005;
+
     /// <summary>The window, in fractions of the screen (PZA UI rules: it scales with the screen).</summary>
     public static string LayoutXml()
     {
         double rh = RadarW * 1.267;   // the page (0.36 x 0.58 window, below its tab strip) is about 1.27 times as wide as high at 16:9: a square picture
         var fighter = new List<string>
         {
-            L.List("lbFighter", 0.02, Top, 0.55, 0.86 - Top),
+            L.List("lbFighter", 0.02, Top, FighterListW, 0.86 - Top),
             L.Portrait("rdImg", RadarX, RadarY, RadarW, rh),
             L.Text("rdCap", 0.56, RadarY + rh + 0.07, 0.43, 0.05, align: "Center"),
             L.Button("FBack", 0.02, 0.88, 0.30, 0.09), L.Button("FSta", 0.35, 0.88, 0.30, 0.09), L.Button("FNext", 0.68, 0.88, 0.30, 0.09),
@@ -123,12 +155,14 @@ public static class SrWindow
         var (vx, vy) = SrRadarImage.Vertex(a, 1.0);
         double fx = RadarX + vx / SrRadarImage.Size * RadarW, fy = RadarY + vy / SrRadarImage.Size * rh;
         const double w = 0.17, h = 0.05;
+        // a label box takes the mouse (its hover text): the left ones stop short of the list (its scroll bar), the right ones at the page's edge
+        double listEnd = 0.02 + FighterListW + LabelGap, left = fx - 0.005 - Math.Min(w, fx - 0.005 - listEnd), right = Math.Min(w, 0.995 - (fx + 0.005));
         return a switch
         {
             0 => (fx - w / 2, fy - h - 0.005, w, h),
             3 => (fx - w / 2, fy + 0.005, w, h),
-            < 3 => (fx + 0.005, fy - h / 2, w, h),
-            _ => (fx - 0.005 - w, fy - h / 2, w, h),
+            < 3 => (fx + 0.005, fy - h / 2, right, h),
+            _ => (left, fy - h / 2, fx - 0.005 - left, h),
         };
     }
 
@@ -188,8 +222,41 @@ public static class SrWindow
 
     #region Bind (every frame) and the texts (every 2 s and after a click)
 
+    /// <summary>The tab control's name in the layout.</summary>
+    const string TabsName = "Tabs";
+
+    static bool s_tabRestored;
+
+    /// <summary>0.1.4 (the plugin's Tab=): the window opens on the page it was left on. Meitou's screen host keeps a window's selected tab
+    /// (GetTab / SetTab); it is put back on the first frame the window is bound, then every change is saved.</summary>
+    static void KeepTab()
+    {
+        if (PzaUi.Host is not { } host) return;
+        try
+        {
+            var s = SrSystem.Settings;
+            if (!s_tabRestored)
+            {
+                s_tabRestored = true;
+                if (s.Tab is > 0 and <= 4) host.SetTab(Id, TabsName, s.Tab);
+                return;
+            }
+            int tab = host.GetTab(Id, TabsName);
+            if (tab != s.Tab && tab is >= 0 and <= 4) Set(nameof(SrSettings.Tab), tab);
+        }
+        catch (Exception e)
+        {
+            s_tabRestored = true;
+            SrLog.Line("window: the page is not remembered (" + e.GetType().Name + ")");
+            s_tabBroken = true;
+        }
+    }
+
+    static bool s_tabBroken;
+
     static void Bind(UiBindings b)
     {
+        if (!s_tabBroken) KeepTab();
         double now = s_clock.Elapsed.TotalSeconds;
         if (s_byChars.Count > 0 && s_byChars.Any(l => PzaFit.RowFits(Window, l) is not null)) s_dirty = true;   // a list now drawn: real-font wrap
         if (s_dirty || now - s_lastBuild > 2.0)
@@ -249,7 +316,7 @@ public static class SrWindow
     static void BuildTexts()
     {
         var squad = s_squad;
-        s_fighterLines = Wrap(FighterText(squad), "lbFighter", 0.55);
+        s_fighterLines = Wrap(FighterText(squad), "lbFighter", FighterListW);
         s_squadLines = Wrap(SrPages.SquadText([.. squad.Select(p => new SrPages.Row { Name = p.Name, S = p.S, Animal = p.Animal, Post = p.Post })], SrSystem.Settings.SortBy, 300), "lbSquad", 0.96);
         lock (SrSystem.Lock)
         {
@@ -263,8 +330,9 @@ public static class SrWindow
     static string HelpText()
     {
         // the user, 2026-11-17: help still spoke of the RE_Kenshi plugin. Chain of command and language are Meitou's own here (meitou.help.*).
-        string[] parts = [S_HELP_INTRO, S_HELP_FIGHTER, S_HELP_CHART, S_HELP_RANKS, S_HELP_SQUAD, S_MEITOU_HELP_COMMAND, S_HELP_RECENT, S_HELP_REPORTS,
-            S_HELP_ARCHIVE, S_HELP_TIMES, S_HELP_NAMES, S_HELP_COLOURS, S_HELP_CREDIT, S_HELP_KEYS, S_MEITOU_HELP_LANGUAGE];
+        // 0.1.4: Fighter, Squad, kept reports and times too (they named the plugin's STA screen, its Sort button and PZAServiceRecord.ini)
+        string[] parts = [S_HELP_INTRO, S_MEITOU_HELP_FIGHTER, S_HELP_CHART, S_HELP_RANKS, S_MEITOU_HELP_SQUAD, S_MEITOU_HELP_COMMAND, S_HELP_RECENT,
+            S_HELP_REPORTS, S_MEITOU_HELP_ARCHIVE, S_MEITOU_HELP_TIMES, S_HELP_NAMES, S_HELP_COLOURS, S_HELP_CREDIT, S_HELP_KEYS, S_MEITOU_HELP_LANGUAGE];
         return SrStr.Colour(string.Join("\n\n", parts.Select(T)));
     }
 
@@ -289,13 +357,13 @@ public static class SrWindow
         lock (SrSystem.Lock) st = SrSystem.Core.Find(s_fighter)?.Clone();
         s_radarOn = false;
         if (s_fighter == 0) return T(S_F_NO_FIGHTER);
-        string name = me?.Name ?? (sel.Count > 0 && SrBridge.Key(sel[0]) == s_fighter ? SelectedName() : "");
-        if (st is null) return SrPages.FighterText(name, new Stats(), false, 0);
+        var shown = s_shown is { } x && x.Key == s_fighter ? x : null;   // 0.1.4: a character with no record yet has its name too
+        string name = me?.Name ?? shown?.Name ?? "";
+        int post = me?.Post ?? shown?.Post ?? 0;
+        if (st is null) return SrPages.FighterText(name, new Stats(), false, post);
         BuildRadar(squad, st, name);
-        return SrPages.FighterText(name, st, true, me?.Post ?? 0);
+        return SrPages.FighterText(name, st, true, post);
     }
-
-    static string SelectedName() => s_squad.FirstOrDefault(p => p.Key == s_fighter)?.Name ?? "";
 
     static void BuildRadar(List<Person> squad, Stats st, string myName)
     {

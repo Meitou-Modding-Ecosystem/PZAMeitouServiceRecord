@@ -293,9 +293,13 @@ public static class SrText
     public const string S_HELP_CREDIT = "help.credit";
     public const string S_HELP_KEYS = "help.keys";
     public const string S_HELP_LANGUAGE = "help.language";
-    // the Meitou version's own help lines (the user, 2026-11-17: the help still described the RE_Kenshi plugin); lang/meitou.<code>.txt
+    // the Meitou version's own lines (the user, 2026-11-17: the help still described the RE_Kenshi plugin); lang/meitou.<code>.txt
     public const string S_MEITOU_HELP_COMMAND = "meitou.help.command";
     public const string S_MEITOU_HELP_LANGUAGE = "meitou.help.language";
+    public const string S_MEITOU_HELP_FIGHTER = "meitou.help.fighter";
+    public const string S_MEITOU_HELP_SQUAD = "meitou.help.squad";
+    public const string S_MEITOU_HELP_ARCHIVE = "meitou.help.archive";
+    public const string S_MEITOU_HELP_TIMES = "meitou.help.times";
 
     /// <summary>Every key with its English text, in the list's order.</summary>
     public static readonly (string Key, string En)[] Table =
@@ -587,8 +591,12 @@ public static class SrText
         (S_HELP_COLOURS, "Colours: ^ggreen^n friendly fire, ^rred^n one of ours down, ^ygold^n the leader falls or who carried it, ^oorange^n big plays, ^bblue^n defence, ^dgrey^n what came after and who never touched the enemy."),
         (S_HELP_CREDIT, "How credit works: a kill goes to the last character who hit the victim before it died; if it dies more than 10 game minutes after its last hit, it died of wounds and nobody gets the kill. A knockout goes to the hit that dropped the victim. Hitting your own side is friendly fire: it is counted on its own and never as kills or knockouts. Someone already lying down when first seen (for example after loading a save) is not a new knockout."),
         (S_HELP_KEYS, "Shift+R opens and closes this window. \"-\" (or a double-click on the title) shrinks it to a small button you can drag; mouse wheel over it for opacity. F7 hides it with Kenshi's interface."),
-        (S_MEITOU_HELP_COMMAND, "CHAIN OF COMMAND: posts and who leads whom come from the PZA Military Manager. Its window is not in the Meitou version yet. Posts already in the save show on the Fighter page, and after the name on the Squad page."),
-        (S_MEITOU_HELP_LANGUAGE, "Language: the window follows Meitou's own language (English, Russian, Chinese or Japanese); the Language setting on Meitou's Settings > Mods page picks another. A change needs a game restart. The After-Action Reports are in English for now."),
         (S_HELP_LANGUAGE, "Language: the window follows Kenshi's own language (English, Russian, Chinese or Japanese); Language=en in PZAServiceRecord.ini keeps it in English. A change needs a game restart. The After-Action Reports are in English for now."),
+        (S_MEITOU_HELP_COMMAND, "CHAIN OF COMMAND: posts and who leads whom come from the PZA Military Manager. Its window is not in the Meitou version yet. Posts already in the save (set with the RE_Kenshi version) show on the Fighter page and after the name on the Squad page, and they are kept when Meitou saves the game."),
+        (S_MEITOU_HELP_LANGUAGE, "Language: the window follows Meitou's own language (English, Russian, Chinese or Japanese); the Language setting on Meitou's Settings > Mods page picks another. A change needs a game restart. The After-Action Reports are in English for now."),
+        (S_MEITOU_HELP_FIGHTER, "Fighter: everything recorded for one character. It opens on the character you have selected; Back and Next step through your squad, \"STA\" jumps back to the selected character."),
+        (S_MEITOU_HELP_SQUAD, "Squad: your squad as a table, best first; animals' names are ^alavender^n. The six buttons under it pick the column it is sorted by: kills, knockouts, damage dealt, biggest hit, damage taken, friendly fire."),
+        (S_MEITOU_HELP_ARCHIVE, "Kept reports: this window shows the battles of this session only, but every report is also kept in a text file, one per faction, in %LOCALAPPDATA%\\kenshi\\PZAServiceRecord\\reports (each starts with the save it was written in; the RE_Kenshi version writes to the same files). Report numbers carry on from the last kept report. A report is about 3 KB. On Meitou's Settings > Mods page, Report archive turns this off and Report archive max MB (50) caps the folder; at the cap nothing more is written."),
+        (S_MEITOU_HELP_TIMES, "Times: \"1:23\" is the time since you loaded the game, at the game's speed (paused time doesn't count); a battle's length and when each person went down use it. Next to it, in brackets, Kenshi's own clock: \"1:23 (07:41)\". Each report's title has the Day it happened, and its first lines say \"In game: Day 413, 07:40 to 07:52\". The Recent page shows both: \"[1:23 | Day 413, 07:41]\". If the Day is one off from the game's own, change Game day offset on Meitou's Settings > Mods page."),
     ];
 }

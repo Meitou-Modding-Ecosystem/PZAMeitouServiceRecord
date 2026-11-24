@@ -1,3 +1,7 @@
 # PZA's Service Record for Meitou: the Meitou version's own lines (ja). Author: PZA. Same format as lang/ja.txt.
-meitou.help.command = 指揮系統：役職と上下関係は PZA Military Manager で決めます。Meitou 版にはまだそのウィンドウがありません。セーブに既にある役職は「戦士」ページと、「分隊」ページの名前の後ろに表示されます。
+meitou.help.command = 指揮系統：役職と上下関係は PZA Military Manager で決めます。Meitou 版にはまだそのウィンドウがありません。セーブに既にある役職（RE_Kenshi 版で設定したもの）は「戦士」ページと、「部隊」ページの名前の後ろに表示され、Meitou がゲームを保存しても残ります。
 meitou.help.language = 言語：ウィンドウは Meitou 自身の言語（英語・ロシア語・中国語・日本語）に従います。Meitou の Settings > Mods ページの Language 設定で別の言語を選べます。変更はゲームの再起動後に反映されます。戦闘後レポートは今のところ英語のみです。
+meitou.help.fighter = 戦士：一人のキャラクターの全記録。選択中のキャラクターで開きます。「前へ」「次へ」で部隊を順に見て、「能力」で選択中のキャラクターに戻ります。
+meitou.help.squad = 部隊：部隊の一覧表（上位から順に）。動物の名前は^aラベンダー色^nです。表の下の6つのボタンで並び替える列を選びます：殺害数、KO数、与ダメージ、最大の一撃、被ダメージ、味方への誤射。
+meitou.help.archive = 保存される報告：このウィンドウは今回のセッションの戦闘だけを表示しますが、報告はすべて勢力ごとのテキストファイルにも保存されます：%LOCALAPPDATA%\\kenshi\\PZAServiceRecord\\reports（それぞれ、書かれたときのセーブ名で始まります。RE_Kenshi 版も同じファイルに書きます）。報告の番号は、最後に保存された報告から続きます。報告1件は約3KB。Meitou の Settings > Mods ページで、Report archive で無効、Report archive max MB (50) でフォルダの上限を設定し、上限に達するとそれ以上は書き込みません。
+meitou.help.times = 時間：「1:23」はゲームを読み込んでからの経過時間です（ゲーム内の速度で計り、ポーズ中は数えません）。戦闘の長さと各人が倒れた時刻に使います。横の括弧内は Kenshi 自身の時計：「1:23 (07:41)」。各報告のタイトルには起きた日（Day）があり、冒頭の行には「In game: Day 413, 07:40 to 07:52」とあります。最近ページは両方を表示：「[1:23 | Day 413, 07:41]」。日付がゲームと1日ずれる場合は、Meitou の Settings > Mods ページで Game day offset を変更してください。

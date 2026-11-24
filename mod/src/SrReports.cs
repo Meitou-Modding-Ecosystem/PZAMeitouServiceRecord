@@ -39,6 +39,18 @@ public static class SrReports
         RecentAll = s.RecentAll;
     }
 
+    /// <summary>A new world (new game or load, 0.1.5; SrSystem.FollowWorld, under its lock): the open fight, the game-clock samples, the
+    /// fight being counted and the Recent lines belong to the world that ended. The archive and the reports already written stay.</summary>
+    public static void NewWorld()
+    {
+        int hits = Aar.DropOpen();
+        if (hits > 0) SrLog.Line($"report: the open fight of the last world ({hits} hits) was dropped, not written");
+        GameClock.Clear();
+        s_fightReport = -1;
+        s_fightCounted.Clear();
+        Ring.Clear();
+    }
+
     #region Hits
 
     /// <summary>One hit (the plugin's AfterHit, report half).</summary>

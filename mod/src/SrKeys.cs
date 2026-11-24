@@ -3,7 +3,7 @@
 // press of the letter with Shift held (no Ctrl / Alt; never while typing) is ours. Plain R (stop / move up) and M (the map) stay Meitou's:
 // prefixes on GameHotkeys.Key and PlayerInterface.WindowHotkey skip the game's handler only for Shift + our letter.
 //   Shift+R   the Service Record window
-//   Shift+M   the Military Manager (beta, only when its setting is on)
+// (Shift+M, the Military Manager, comes with its port in 0.2.0; until then Shift+M stays Meitou's.)
 using HarmonyLib;
 using Meitou.Game.Host.Input;
 
@@ -42,7 +42,7 @@ public static class SrKeys
         }
     }
 
-    static bool Ours(Key key, bool shift) => shift && (key == Key.R || key == Key.M && SrSystem.Settings.MilitaryManagerBeta);
+    static bool Ours(Key key, bool shift) => shift && key == Key.R;
 
     static void ResolvePostfix(TickInput input)
     {

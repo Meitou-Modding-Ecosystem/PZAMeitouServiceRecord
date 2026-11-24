@@ -4,7 +4,8 @@
 //                                   the attacker counts it as an ally, read before the hit can change relations); the hit observer
 //                                   (ICombatHitObserver, SrSystem) reads AFTER and feeds the core, as the plugin brackets the hit.
 //   getStealthKOChance + knockout -> a postfix on CarrySystem.Strike: its own log entry says who tried and whether the knockout landed.
-//   serialise / loadFromSerialise -> postfixes on SaveCapture.WriteBody and SavedCharacters.Read / Again (SrSave).
+//   serialise / loadFromSerialise -> postfixes on SaveCapture.WriteBody and SavedCharacters.Read / Again (SrSave); since 0.1.4 also the
+//                                   Military Manager's pza_post / pza_form / pza_sup / pza_hid, carried unchanged.
 //   ~Character                   -> SrSystem forgets a character whose id no longer resolves (its record stays on its stats object).
 // Members are looked up by name (internal types); a miss switches that part off with a line naming it, never a crash.
 using System.Reflection;
@@ -99,7 +100,12 @@ public static class SrBridge
     {
         try
         {
-            if (DialogueOf(world) is { } d) return d.RegardsFriendly(world, a, v);
+            if (s_friendly is { } f && DialogueOf(world) is { } d)
+            {
+                var args = (object?[])s_friendlyArgs!.Clone();
+                (args[0], args[1], args[2]) = (world, a, v);
+                return f.Invoke(d, args) is true;
+            }
             var (ac, vc) = (world.Characters.Cold(a), world.Characters.Cold(v));
             return ac is not null && vc is not null && ac.Faction == vc.Faction;
         }
@@ -108,6 +114,37 @@ public static class SrBridge
             Interlocked.Increment(ref AllyFaults);
             return false;
         }
+    }
+
+    /// <summary>
+    /// 0.1.6: DialogueSystem.RegardsFriendly found by name, not bound at build time. Meitou 0.22.2's nightlies gave it an optional
+    /// <c>bool disguise = false</c>; the 0.20.1-built DLL asked for the exact (World, int, int) and the call failed when its caller was compiled,
+    /// inside our prefix on the game's hit (RefCheck on 0.22.2-nightly.20261122.2, 2026-11-22). Any public RegardsFriendly(World, int, int, ...)
+    /// whose further parameters are optional is used with their defaults; none found: the same-faction rule, said once in the log.
+    /// </summary>
+    static MethodInfo? s_friendly;
+
+    static object?[]? s_friendlyArgs;
+
+    /// <summary>What the ally test uses on this Meitou (for the log and the offline check).</summary>
+    public static string AllyTest = "not looked up";
+
+    public static void FindRegardsFriendly()
+    {
+        s_friendly = null;
+        foreach (var m in typeof(DialogueSystem).GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                     .Where(m => m.Name == "RegardsFriendly" && m.ReturnType == typeof(bool)).OrderBy(m => m.GetParameters().Length))
+        {
+            var ps = m.GetParameters();
+            if (ps.Length < 3 || ps[0].ParameterType != typeof(World) || ps[1].ParameterType != typeof(int) || ps[2].ParameterType != typeof(int)
+                || ps.Skip(3).Any(p => !p.IsOptional))
+                continue;
+            s_friendlyArgs = [.. ps.Select(p => p.IsOptional ? p.DefaultValue : null)];
+            s_friendly = m;
+            AllyTest = "DialogueSystem.RegardsFriendly(" + string.Join(", ", ps.Select(p => p.ParameterType.Name + (p.IsOptional ? " = " + (p.DefaultValue ?? "null") : ""))) + ")";
+            return;
+        }
+        AllyTest = "DialogueSystem.RegardsFriendly(World, int, int, ...) not found: friendly fire uses the same-faction rule";
     }
 
     static World? s_dialogueWorld;
@@ -173,9 +210,15 @@ public static class SrBridge
         if (__result is null || s_partsStats?.GetValue(__result) is not CharacterStats stats || s_partsSource?.GetValue(__result) is not SaveCharacter sc
             || sc.Stats is not { } rec)
             return;
-        if (SrSave.Of(stats) is not null) return;
         try
         {
+            // 0.1.4: the Military Manager's keys, kept as they are (shown on the pages, written back by WriteBodyPostfix)
+            if (SrSave.CommandOf(stats) is null && SrSave.ReadCommand(rec.Floats, rec.Strings) is { } command)
+            {
+                SrSave.AttachCommand(stats, command);
+                Interlocked.Increment(ref SrSave.CommandsRead);
+            }
+            if (SrSave.Of(stats) is not null) return;
             if (SrSave.Read(rec.Floats, rec.Strings, sc.Name) is { } record) SrSave.Attach(stats, record);
         }
         catch (Exception e)
@@ -187,6 +230,11 @@ public static class SrBridge
     /// <summary>A character is being written: its record goes into its STATS record (nothing for one without stats, as the plugin).</summary>
     static void WriteBodyPostfix(SaveCharacter sc, CharacterStats? stats)
     {
+        if (SrSave.CommandOf(stats) is { } command && sc.Stats is { } crec)
+        {
+            SrSave.WriteCommand(crec.Floats, crec.Strings, command);
+            Interlocked.Increment(ref SrSave.CommandsWritten);
+        }
         var s = SrSave.Of(stats);
         if (s is null || s.Empty) { Interlocked.Increment(ref SrSave.SavesSkippedEmpty); return; }
         if (sc.Stats is not { } rec) { Interlocked.Increment(ref SrSave.SaveNoRecord); return; }
@@ -224,6 +272,8 @@ public static class SrBridge
         Patch(h, lines, characters, "Read", nameof(ReadPostfix), prefix: false, needs: s_partsStats);
         Patch(h, lines, characters, "Again", nameof(ReadPostfix), prefix: false, needs: s_partsStats);
         if (s_shooter is null) lines.Add("Projectile.Shooter not found: ranged hits carry no attacker");
+        FindRegardsFriendly();
+        lines.Add("ally test: " + AllyTest);
         return lines;
     }
 

@@ -28,7 +28,7 @@ public sealed class Engine
     List<Event> _pendingEv = [];
     readonly LinkedList<Report> _reports = new();
     double _last = -1e9;
-    readonly SortedDictionary<ulong, string> _factions = [];
+    SortedDictionary<ulong, string> _factions = [];
     Context _place = new(), _prevPlace = new();
     bool _placeSet;
     List<Hit> _prevHits = [];
@@ -96,6 +96,34 @@ public sealed class Engine
     public bool InBattle => _hits.Count > 0;
 
     public int LiveHits => _hits.Count;
+
+    #endregion
+
+    #region A new world
+
+    /// <summary>A new world (new game or load, 0.1.5): the battle still open and the last one (kept to merge a follow-up) belong to the world
+    /// that ended, and so do the factions known by id; all are dropped unwritten, so no fight runs on into the next save. The reports already
+    /// written stay (their numbers go on). The faction map is replaced, not cleared: the written reports hold the old one. Returns the open
+    /// battle's hits.</summary>
+    public int DropOpen()
+    {
+        int n = _hits.Count;
+        _hits.Clear();
+        _names = [];
+        _pendingEv = [];
+        _factions = [];
+        _last = -1e9;
+        _place = new Context();
+        _prevPlace = new Context();
+        _placeSet = false;
+        _prevHits = [];
+        _prevNames = [];
+        _prevEv = [];
+        _prevNumber = 0;
+        _prevT1 = -1e9;
+        _prevMops.Clear();
+        return n;
+    }
 
     #endregion
 
@@ -288,10 +316,7 @@ public sealed class Engine
         {
             foes = group;
             r.Fired.Add("NAMED BY FACTION");
-            int sp = group.LastIndexOf(' ');
-            string lw = Lower(sp < 0 ? group : group[(sp + 1)..]);
-            if (lw.Length > 2 && lw[^1] == 's' && lw[^2] != 's') { manyW = lw; oneW = lw[..^1]; }
-            else { manyW = "enemies"; oneW = "enemy"; }
+            (oneW, manyW) = FactionNoun(group);
         }
         one = oneW;
         many = manyW;

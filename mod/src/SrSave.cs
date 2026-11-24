@@ -33,6 +33,60 @@ public static class SrSave
         lock (s_lock) s_records.AddOrUpdate(stats, record);
     }
 
+    #region The chain of command keys (the plugin's Military Manager: pza_post, pza_form, pza_sup, pza_hid)
+
+    /// <summary>A character's chain-of-command keys exactly as a save had them (the RE_Kenshi plugin's v0.8.0 Military Manager writes them). The
+    /// Meitou version has no Military Manager yet (0.2.0): it shows the post and carries all four keys back into every save of the character,
+    /// value for value, so a save the RE_Kenshi plugin wrote keeps them (0.1.4). Meitou reuses a loaded character's STATS record when it saves, but
+    /// a character it writes into a fresh record (moved to another squad) would lose them.</summary>
+    public sealed class Command
+    {
+        public float? Post, Form;
+        public string? Sup, Hid;
+
+        /// <summary>The post as the plugin reads it (pza_post above 0.5 and below 100, rounded); 0 = none.</summary>
+        public int PostNumber => Post is float f && f > 0.5f && f < 100.0f ? (int)(f + 0.5f) : 0;
+    }
+
+    static readonly ConditionalWeakTable<CharacterStats, Command> s_commands = new();
+
+    /// <summary>The kept chain-of-command keys on <paramref name="stats"/>; null when the save had none.</summary>
+    public static Command? CommandOf(CharacterStats? stats)
+    {
+        if (stats is null) return null;
+        lock (s_lock) return s_commands.TryGetValue(stats, out var c) ? c : null;
+    }
+
+    public static void AttachCommand(CharacterStats stats, Command command)
+    {
+        lock (s_lock) s_commands.AddOrUpdate(stats, command);
+    }
+
+    /// <summary>Counters: characters read with chain-of-command keys, and saves that carried them back.</summary>
+    public static long CommandsRead, CommandsWritten;
+
+    /// <summary>The four keys from a saved STATS record, exactly as they are (null: none of them).</summary>
+    public static Command? ReadCommand(IReadOnlyDictionary<string, float> f, IReadOnlyDictionary<string, string> str)
+    {
+        var c = new Command();
+        if (f.TryGetValue("pza_post", out float v)) c.Post = v;
+        if (f.TryGetValue("pza_form", out v)) c.Form = v;
+        if (str.TryGetValue("pza_sup", out var t)) c.Sup = t;
+        if (str.TryGetValue("pza_hid", out t)) c.Hid = t;
+        return c.Post is null && c.Form is null && c.Sup is null && c.Hid is null ? null : c;
+    }
+
+    /// <summary>The kept keys back into a STATS record, each one that was read, unchanged.</summary>
+    public static void WriteCommand(IDictionary<string, float> f, IDictionary<string, string> str, Command c)
+    {
+        if (c.Post is float p) f["pza_post"] = p;
+        if (c.Form is float m) f["pza_form"] = m;
+        if (c.Sup is { } s) str["pza_sup"] = s;
+        if (c.Hid is { } h) str["pza_hid"] = h;
+    }
+
+    #endregion
+
     #region Reading (the plugin's LoadHook)
 
     /// <summary>Reads our keys from a saved STATS record into a record (null: nothing of ours, and no Kill Counter import). Logs as the plugin.</summary>

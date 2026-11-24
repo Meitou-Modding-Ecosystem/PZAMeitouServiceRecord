@@ -52,9 +52,10 @@ public sealed class SrSettings
     [Setting("Report advice", Hint = "The reports' SUSTAIN / IMPROVE section.", SubGroup = "Reports")]
     public bool ReportAdvice { get; set; }
 
-    [Setting("Game day offset", Hint = "The Day in reports = whole in-game days since the game began + this.", Min = -1, Max = 3, Step = 1,
+    // 0.1.4: 0 (the plugin's is 1). Meitou's clock already counts its start day: with 1 every report said Day 2 under a HUD saying Day 1.
+    [Setting("Game day offset", Hint = "Added to the Day in reports; 0 = the Day on Meitou's own clock.", Min = -1, Max = 3, Step = 1,
         SubGroup = "Reports")]
-    public int GameDayOffset { get; set; } = 1;
+    public int GameDayOffset { get; set; }
 
     [Setting("Report archive", Hint = "Keep every After-Action Report in a text file, one per faction.", SubGroup = "Reports")]
     public bool ReportArchive { get; set; } = true;
@@ -90,9 +91,8 @@ public sealed class SrSettings
     [Setting("Squad page sort", Hint = "0 kills, 1 knockouts, 2 damage dealt, 3 biggest hit, 4 damage taken, 5 friendly fire.", Min = 0, Max = 5, Step = 1, SubGroup = "Window")]
     public int SortBy { get; set; }
 
-    [Setting("Military Manager (beta)", Hint = "Shift+M and the post marks on the portraits. In the works: off by default.")]
-    public bool MilitaryManagerBeta { get; set; }
+    [Setting("Window page", Hint = "The page the window was left on: 0 Fighter, 1 Squad, 2 Recent, 3 Reports, 4 Help.", Min = 0, Max = 4, Step = 1, SubGroup = "Window")]
+    public int Tab { get; set; }
 
-    [Setting("Portrait insignia", Hint = "The post mark on the squad portraits.")]
-    public bool PortraitInsignia { get; set; } = true;
+    // 0.1.4: "Military Manager (beta)" and "Portrait insignia" are gone until the Military Manager is ported (0.2.0): neither did anything here.
 }

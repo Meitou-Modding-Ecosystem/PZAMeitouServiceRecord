@@ -1,58 +1,95 @@
-# PZA's Service Record for Meitou (beta 0.1.3)
+# PZA's Service Record for Meitou
 
-Every fighter keeps a service record: kills, knockouts, one-hit knockouts, limbs taken and lost, damage dealt and taken, biggest hits, and a
-radar chart of their fighting style. After a big fight you get an **After-Action Report** with advice on what to keep and what to improve.
-A port of PZA's Service Record for RE_Kenshi, aiming at the same numbers and rules.
+> **Version 0.1.7** (beta) · loads on Meitou 0.20.1 and newer (no upper cap) · checked on 0.20.1, 0.21.0, 0.22.1 and 0.22.2 nightlies · windows on
+> [PZA's Meitou UI](https://github.com/Meitou-Modding-Ecosystem/PZAMeitouUi) · English, Russian, Chinese, Japanese (the battle reports are
+> English for now) · GPLv3 or later · by PZA
 
-**Download:** the mod zip and its source zip are on the [Releases page](https://github.com/PZA-Mods/PZAMeitouServiceRecord/releases). Building from source: [BUILD.md](BUILD.md).
+A combat record for every fighter in your squad. Service Record counts what each of your people actually does in a fight (who they drop,
+how hard they hit, what they take, who carried the battle) and keeps it with the character in the save. It is a port of the RE_Kenshi plugin
+PZA Service Record 0.12.1 to Meitou, aiming at full parity: the same rules, numbers, lines and save keys.
 
-## Hotkeys
+![The Fighter page: the record and the six-axis chart](media/sr-fighter.jpg)
 
-| Key | What it does |
+## What it does
+
+- **Per-fighter stats.** Kills, knockouts dealt and suffered, limbs taken and lost, damage dealt and taken, the biggest hit (and on whom),
+  one-hit knockouts and one-hit kills, friendly fire on its own line, and fights counted. Clear rules decide the credit: a kill goes to the last
+  hit before death, a death more than 10 game minutes after the last hit is "died of wounds", a knockout goes to the blow that dropped the
+  victim, and someone already lying down when first seen is not a new knockout. Stealth knockouts count too.
+- **Ranks.** Every fighter earns a rank from their own record (Recruit to Legend). A rank changes nothing in the game.
+- **The chart.** Six axes on the Fighter page (Lethality, Takedowns, Maiming, Damage, Endurance, First strike), each scored against the best
+  in your squad, per fight. Hover a label for the number and who holds the squad's best.
+- **After-Action Reports.** When a fight ends (30 seconds without a blow), a report is written: who opened it, who held the line, who carried
+  it, the leader's fall, friendly fire, what happened after. Every report is also kept in a text file per faction, so your history survives
+  the session.
+- **Recent.** This session's knockouts, kills, limbs and friendly fire involving your people, with session time and Kenshi's own clock.
+- **STA lines.** Up to three compact lines (or all twelve) in each character's own stats window.
+- **The window.** Shift+R opens Fighter, Squad, Recent, Reports and a Help page. Shrink it to a small button you can drag; F7 hides it with
+  the game's interface. Places, page, sort and settings survive a restart; rules and report settings apply at once from Settings > Mods.
+- **One record, both games.** The record is saved in the character's own save data under the RE_Kenshi plugin's keys. A save played with the
+  original-game plugin carries its history into Meitou and back, including Military Manager posts (shown and kept). Kill Counter's numbers are
+  imported once if they are there.
+
+![An After-Action Report](media/sr-reports.jpg)
+![The Squad page](media/sr-squad.jpg)
+![The Recent page](media/sr-recent.jpg)
+
+## What's new in 0.1.7
+
+- **United Cities AAR wording:** encounters with mixed United Cities patrols now name their soldiers `samurai` instead of stripping `-s` from `cities`. Irregular faction plurals (`Shinobi Thieves` -> `thief`/`thieves`, `City Heroes` -> `hero`/`heroes`) and non-person trailing faction nouns are handled cleanly too.
+- **0.1.6:** friendly fire uses Meitou's `DialogueSystem.RegardsFriendly` looked up by name, so it works on Meitou 0.22.2 nightlies as well as 0.20.1–0.22.1.
+- **0.1.5:** a new game or load starts clean — records, clock, Recent lines and any open fight no longer carry over from a previous world.
+- **0.1.4:** window position, tab, sort and Advice survive restarts; settings apply immediately; Military Manager posts saved by RE_Kenshi are shown and preserved; radar labels stay clear of the Fighter list; report times and Day match Meitou's HUD.
+
+## What's planned
+
+- **Military Manager** (0.2.0): the original-game plugin's chain of command, posts and portrait marks, ported to Meitou.
+- **Turret vs combat separation**, **per-body-part damage**, **target-type breakdown** (Humans / Skeletons / Animals) and **slavery history**.
+- **Deaths from Meitou's own death notice** instead of the short poll the port uses today.
+- **A small read-only `ServiceRecordApi`** for other mods (below), and **TWR's titles on the Fighter page**.
+
+## How it fits the ecosystem
+
+Service Record keeps to one lane: what each fighter does in combat, measured. Other mods in the
+[Meitou-Modding-Ecosystem](https://github.com/Meitou-Modding-Ecosystem) tell the rest of the story, and the pieces fit side by side:
+
+| Mod | Its lane |
 |---|---|
-| **Shift+R** | Opens or closes the Service Record window |
+| [The Wasteland Remembers](https://github.com/Meitou-Modding-Ecosystem/TheWastelandRemembers) | How the world remembers your squad: town heat, bounty hunters, rivals, town talk, and its own squad record of deeds and titles |
+| [Rivalry Core](https://github.com/Meitou-Modding-Ecosystem/RivalryCore) | How factions size up the player and act on it: hunts, raids, reinforcements |
+| [Dustlife](https://github.com/Meitou-Modding-Ecosystem/Dustlife) | The war between factions off screen: sieges, raids, marching bands |
+| **Service Record** | How each of your fighters fights: the combat numbers, the ranks, the battle reports |
 
-Plain R stays Meitou's. Nothing fires while you type in a text box.
+They don't need each other. Each runs alone, and each gets better when the others are there.
 
-## The window and the records
-- **Shift+R** window, tabs **Fighter** (your selected character's record and radar chart; Back / Next step through your fighters),
-  **Squad** (everyone with a record, six ways to sort), **Recent** (the latest kills and knockouts with times), **Reports** (the After-Action
-  Reports, in colour) and **?** (help).
-- Three short lines under the attributes on the character screen (kills / KOs / limbs, damage dealt / taken, KO'd / limbs lost); hover one
-  for the full text.
-- **After-Action Reports** are written after a fight of 8+ hits once 30 s pass without a hit, and kept as text files in
-  `%LOCALAPPDATA%\kenshi\PZAServiceRecord\reports\`.
-- Records are saved with your game. A save made with the RE_Kenshi version should bring its records along (not tried yet).
-- The **-** button shrinks the window to a tiny button: drag it, mouse wheel for its opacity, click for the window. Its place is kept.
+## A proposal: working together
 
-## Requires
-**Meitou 0.20.1 and newer.** Checked on Meitou 0.20.1, 0.21.0 and 0.22.1; there is no upper version cap any more, so a newer Meitou no longer refuses it.
+Proposed in [RivalryCore#140](https://github.com/Meitou-Modding-Ecosystem/RivalryCore/issues/140), for discussion with the other authors.
+Service Record would offer a small read-only API in the style of TWR's `WastelandApi`: found by reflection, plain types only, nothing
+throws, null when the mod isn't installed.
+
+- `Stats(character)`: kills, knockouts dealt and suffered, limbs, damage dealt and taken, biggest hit, one-hit knockouts, fights.
+- `Rank(character)`.
+- `Battles(since)`: each battle report, with when, where, who fought and the outcome.
+
+What that could make possible, if the other authors want it:
+
+- **TWR's titles on the Fighter page.** Service Record reads TWR's `SquadTitles()` and shows each fighter's titles next to their numbers.
+  Deeds and titles stay TWR's.
+- **Rivalry Core** could ask which of the player's fighters is the most dangerous before deciding who to hunt.
+- **Dustlife** could name a squad's veteran in its war news.
+- **A kill cam** (PZA's Director's Kit with PZA's SlowMo) could fire on a credited kill rather than on any blow.
+
+Every one of these is an optional read. No mod would depend on another, and each would carry on unchanged when the other isn't installed.
 
 ## Install
-- Unpack `PZAServiceRecord.Meitou-0.1.3-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAServiceRecord\`), then tick
-  **PZAServiceRecord** in Meitou's mod list. If you also use PZA's Service Record for RE_Kenshi, it is the same folder on purpose: each game
-  loads only its own file.
-- No items or world data; load order doesn't matter. You can remove it at any time; whether the records come back after saving without it has not been tried yet.
 
-## This is a beta
-**The rules are checked offline against the RE_Kenshi version's own code (thousands of random fights through both, every number equal), on
-Meitou 0.20.1, 0.21.0 and 0.22.1. This build has not been played in game yet.**
+Releases: [GitHub releases](https://github.com/Meitou-Modding-Ecosystem/PZAMeitouServiceRecord/releases). Unpack into Kenshi's folder
+(`Kenshi\mods\PZAServiceRecord\`) and tick **PZAServiceRecord** in Meitou's mod list. If you also use PZA's Service Record for RE_Kenshi, it
+is the same folder on purpose: each game loads only its own file.
 
-Known limits:
-- The Military Manager (Shift+M, the chain of command) of the RE_Kenshi version is not in this build yet.
-- Texts in English, Russian, Chinese and Japanese (machine translations, not yet checked by native speakers).
+Building from source: [BUILD.md](BUILD.md).
 
-## Planned
-Ideas, no dates:
-- **The Military Manager** from the RE_Kenshi version: your own chain of command (Commander-in-Chief, Generals, Captains, Sergeants), post
-  marks on the portraits, bodyguard orders down the chain, and one-press Auto-Organize by merit.
-- **Specialties** (a Combat Medic, a Ranger...) and a **sparring organiser** for training.
+## Licence
 
-## Reporting a bug
-What happened (for a wrong count: who hit whom, how, and what the record says), how to make it happen again, your Meitou version and mod
-list, and Meitou's `log.txt` (in your Meitou folder) copied right after that session. Our lines start with `PZA's Service Record:`. Post it
-in its thread on the Meitou Discord or in the Workshop page's Bug reports discussion.
-
-## Licence and source
-GNU GPL version 3 or later; the source is attached to the release (`-source.zip`). Made by **PZA**. Unofficial fan-made mod; not affiliated
-with Lo-Fi Games.
+GNU GPL version 3 or later (`LICENSE`). Made by **PZA**. Unofficial fan-made mod; not affiliated with Lo-Fi Games.

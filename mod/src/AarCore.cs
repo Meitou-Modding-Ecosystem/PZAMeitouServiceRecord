@@ -91,11 +91,20 @@ public static class GameClock
     public static int DayOffset = 1;
     public static long Samples, Resets;
 
-    public static void Clear() { s_s.Clear(); s_dirty = true; Samples = Resets = 0; }
+    /// <summary>Meitou (0.1.4): every tick's exact reading is kept, and a moment at or after the last sample is read from it instead of
+    /// extrapolated. The plugin samples once a second and extrapolates the last two samples' slope, so right after a time skip (the slope of an
+    /// hours-long jump in one second) "now" landed hours ahead: a Recent line said 17:59 while Meitou's HUD said 17:05 (the user's screenshots,
+    /// 2026-11-21). Off by default: the differential replay keeps the plugin's own rule.</summary>
+    public static bool KeepLatest;
+
+    static (double T, double H)? s_latest;
+
+    public static void Clear() { s_s.Clear(); s_dirty = true; Samples = Resets = 0; s_latest = null; }
 
     public static void Sample(double t, double hours)
     {
         if (double.IsNaN(t) || double.IsNaN(hours) || hours < 0 || hours > 1e8) return;
+        if (KeepLatest) s_latest = (t, hours);
         if (s_s.Count > 0 && (t < s_s.Last!.Value.T || hours < s_s.Last.Value.H - 1e-6)) { s_s.Clear(); ++Resets; }
         if (s_s.Count > 0 && t - s_s.Last!.Value.T < 1.0) return;
         s_s.AddLast((t, hours));
@@ -120,6 +129,12 @@ public static class GameClock
         if (s.Count == 0 || double.IsNaN(t) || t < s[0].T - 1.0) return false;
         if (t >= s[^1].T)
         {
+            if (KeepLatest && s_latest is { } l && l.T >= s[^1].T && t - l.T <= 1.0)
+            {   // between the last sample and the latest tick: straight between them; at or past the latest tick: the latest reading
+                double sp = l.T - s[^1].T;
+                h = t >= l.T ? l.H : sp > 0 ? s[^1].H + (l.H - s[^1].H) * (t - s[^1].T) / sp : l.H;
+                return true;
+            }
             if (t - s[^1].T > 120.0) return false;
             double slope = 0;
             if (s.Count >= 2)
@@ -301,6 +316,30 @@ public static class Words
     }
 
     public static string CountNoun(double n, string singular) => n == 1 ? singular : Plural(singular);
+
+    static readonly HashSet<string> s_nonPersonFactionNouns = new(StringComparer.Ordinal)
+    {
+        "cities", "bones", "lands", "hills", "plains", "wastes", "ruins", "isles", "islands",
+        "sands", "swamps", "mountains", "gates", "walls", "towers", "forts", "bases", "camps",
+    };
+
+    /// <summary>Short singular/plural fighter noun for a faction name (0.1.7 / plugin 0.12.1: "United Cities" -> "samurai", not "citie" /
+    /// "cities"; irregular plurals reversed through the plural table; non-person trailing nouns fall back to "enemy" / "enemies").</summary>
+    public static (string One, string Many) FactionNoun(string group)
+    {
+        string lg = LowerAscii(group);
+        if (lg == "united cities") return ("samurai", "samurai");
+        int sp = lg.LastIndexOf(' ');
+        string lw = sp < 0 ? lg : lg[(sp + 1)..];
+        if (s_nonPersonFactionNouns.Contains(lw)) return ("enemy", "enemies");
+        string? found = null;
+        foreach (var (k, v) in s_plurals)
+            if (v == lw && (found is null || string.CompareOrdinal(k, found) < 0)) found = k;
+        if (found is not null) return (found, lw);
+        if (lw.Length > 4 && lw.EndsWith("ies", StringComparison.Ordinal)) return (lw[..^3] + "y", lw);
+        if (lw.Length > 2 && lw[^1] == 's' && lw[^2] != 's') return (lw[..^1], lw);
+        return ("enemy", "enemies");
+    }
 
     #endregion
 

@@ -1,3 +1,7 @@
 # PZA's Service Record for Meitou: the Meitou version's own lines (zh). Author: PZA. Same format as lang/zh.txt.
-meitou.help.command = 指挥链：职务和上下级关系由 PZA Military Manager 设定。Meitou 版本中还没有它的窗口。存档中已有的职务会显示在“战士”页，以及“小队”页的名字后面。
+meitou.help.command = 指挥链：职务和上下级关系由 PZA Military Manager 设定。Meitou 版本中还没有它的窗口。存档中已有的职务（由 RE_Kenshi 版本设定）会显示在“战士”页，以及“小队”页的名字后面，Meitou 保存游戏时也会保留它们。
 meitou.help.language = 语言：窗口跟随 Meitou 自身的语言（英语、俄语、中文或日语）；在 Meitou 的 Settings > Mods 页面中，Language 设置可选择其他语言。更改需要重启游戏。战后报告目前仅有英文。
+meitou.help.fighter = 战士：一个角色的全部记录。打开时显示你选中的角色；“上一个”和“下一个”在你的小队中逐个切换，“状态”按钮跳回选中的角色。
+meitou.help.squad = 小队：以表格列出你的小队，最佳者在前；动物的名字为^a淡紫色^n。表格下方的六个按钮选择排序依据的列：击杀、击倒、造成伤害、最重一击、承受伤害、误伤。
+meitou.help.archive = 保存的报告：此窗口只显示本次游戏的战斗，但每份报告也会保存到文本文件中，每个帮派一个文件，位于 %LOCALAPPDATA%\\kenshi\\PZAServiceRecord\\reports（每份报告开头注明写入时所用的存档；RE_Kenshi 版本写入同样的文件）。报告编号接着上一份已保存的报告继续。一份报告约 3 KB。在 Meitou 的 Settings > Mods 页面中，Report archive 可关闭此功能，Report archive max MB（50）限制文件夹大小，达到上限后不再写入。
+meitou.help.times = 时间：“1:23”是从读取游戏起经过的时间，按游戏速度计算（暂停的时间不算）；战斗时长和每个人倒下的时刻都用它。旁边括号里是 Kenshi 自己的时钟：“1:23 (07:41)”。每份报告的标题带有战斗发生的日期（Day），开头几行写着“In game: Day 413, 07:40 to 07:52”。近况页两者都显示：“[1:23 | Day 413, 07:41]”。如果 Day 与游戏自己的日期差了一天，请在 Meitou 的 Settings > Mods 页面修改 Game day offset。

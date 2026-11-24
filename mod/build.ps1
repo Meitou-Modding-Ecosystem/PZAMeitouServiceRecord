@@ -30,7 +30,8 @@ if (-not (Test-Path (Join-Path $MeitouDir "MeitouClient.dll"))) { throw "MeitouC
 & dotnet build (Join-Path $here "PZAServiceRecord.Meitou.csproj") -c Release -nologo "-p:MeitouDir=$MeitouDir"
 if ($LASTEXITCODE -ne 0) { throw "dotnet build failed ($LASTEXITCODE)" }
 
-$bin = Get-ChildItem (Join-Path $here "bin\Release") -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# the DLL just built: the newest DLL file, not the newest folder (2026-11-21: an old net10.0 folder won by its folder date and a stale DLL was staged)
+$bin = (Get-ChildItem (Join-Path $here "bin\Release") -Recurse -Filter "PZAServiceRecord.Meitou.dll" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Directory
 $stage = Join-Path $here "out\PZAServiceRecord"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $stage | Out-Null
@@ -74,12 +75,16 @@ if ($Check) {
     $runDir = if ($RunOn -ne "") { [System.IO.Path]::GetFullPath($RunOn) } else { $MeitouDir }
     if (-not (Test-Path (Join-Path $runDir "MeitouClient.dll"))) { throw "MeitouClient.dll not found in $runDir" }
     Write-Host "check: the mod built against $MeitouDir, run on $runDir"
-    $rt = Join-Path $here "out\checkrt"
-    if (Test-Path $rt) { Remove-Item -Recurse -Force $rt }
-    New-Item -ItemType Directory -Force $rt | Out-Null
-    $patterns = "System*.dll", "Microsoft.*.dll", "mscorlib.dll", "netstandard.dll", "WindowsBase.dll", "coreclr.dll", "clrjit.dll",
-                "clrgc.dll", "hostfxr.dll", "hostpolicy.dll", "Meitou*.dll", "0Harmony.dll", "Bepu*.dll", "DotRecast*.dll", "Stb*.dll"
-    foreach ($p in $patterns) { Copy-Item (Join-Path $runDir $p) $rt -Force }
+    # one runtime folder per Meitou release, with every DLL of it (2026-11-22: 0.22.2-nightly.20261122.2's MeitouClient loads Silk.NET.Core in
+    # its module initializer; a fixed list of patterns missed it). Per release, so -Check runs on different releases never overwrite each
+    # other's files (the same layout as PZA's SlowMo for Meitou 3d3da06)
+    $rt = Join-Path $here ("out\checkrt\" + (Split-Path $runDir -Leaf))
+    $stamp = Join-Path $rt "meitou-dir.txt"
+    if (-not (Test-Path $stamp) -or (Get-Content $stamp -Raw).Trim() -ne $runDir) {
+        New-Item -ItemType Directory -Force $rt | Out-Null
+        foreach ($p in "*.dll", "*.so") { Copy-Item (Join-Path $runDir $p) $rt -Force -ErrorAction SilentlyContinue }
+        Set-Content -Path $stamp -Value $runDir -Encoding ascii
+    }
     $stagedDll = Join-Path $stage "PZAServiceRecord.Meitou.dll"
     & dotnet build (Join-Path $here "tools\check\check.csproj") -c Release -nologo "-p:MeitouDir=$runDir" "-p:ModDll=$stagedDll" -o (Join-Path $here "out\checkbin")
     if ($LASTEXITCODE -ne 0) { throw "check tool build failed ($LASTEXITCODE)" }
