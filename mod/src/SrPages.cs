@@ -46,12 +46,50 @@ public static class SrPages
         t += TS(S_F_DEALT, N(s.Dealt)) + "\n";
         t += TS(S_F_BIGGEST, N(s.Biggest)) + "\n";
         if (s.BiggestOn.Length > 0) t += TS(S_F_BIGGEST_ON, s.BiggestOn) + "\n";
+        if (s.HasPartDmg)
+        {
+            t += "\n" + T(S_F_BY_PART) + "\n";
+            t += TS(S_F_PART_HEAD, N(s.DmgHead)) + "\n";
+            t += TS(S_F_PART_CHEST, N(s.DmgChest)) + "\n";
+            t += TS(S_F_PART_STOMACH, N(s.DmgStomach)) + "\n";
+            t += TS(S_F_PART_ARMS, N(s.DmgArms)) + "\n";
+            t += TS(S_F_PART_LEGS, N(s.DmgLegs)) + "\n";
+        }
+        if (s.HasTargetBreakdown)
+        {
+            t += "\n" + T(S_F_BY_TARGET) + "\n";
+            if (s.DmgHuman > 0 || s.KillsHuman > 0) t += TS(S_F_TGT_HUMAN, ServiceCore.Short(s.DmgHuman), N(s.KillsHuman)) + "\n";
+            if (s.DmgRobot > 0 || s.KillsRobot > 0) t += TS(S_F_TGT_ROBOT, ServiceCore.Short(s.DmgRobot), N(s.KillsRobot)) + "\n";
+            if (s.DmgAnimal > 0 || s.KillsAnimal > 0) t += TS(S_F_TGT_ANIMAL, ServiceCore.Short(s.DmgAnimal), N(s.KillsAnimal)) + "\n";
+        }
+        if (s.HasTurrets)
+        {
+            t += "\n" + T(S_F_TURRETS) + "\n";
+            t += TS(S_F_KILLS, N(s.TurretKills)) + "\n";
+            t += TS(S_F_KOS, N(s.TurretKOs)) + "\n";
+            t += TS(S_F_LIMBS, N(s.TurretLimbs)) + "\n";
+            t += TS(S_F_DEALT, N(s.TurretDealt)) + "\n";
+        }
         t += "\n" + T(S_F_DEFENCE) + "\n";
         t += TS(S_F_TAKEN, N(s.Taken)) + "\n";
         t += TS(S_F_TIMESKO, SrStr.TP(S_TIMES_ONE, s.TimesKO)) + "\n";
         t += TS(S_F_BY_ENEMY, N(s.KosSuffered)) + "\n";
         t += TS(S_F_LIMBS_LOST, N(s.LimbsLost)) + "\n";
         t += "\n" + TS(S_F_FIGHTS, N(s.Fights)) + "\n";
+        if (s.Slavery.Length > 0)
+        {
+            var stints = ServiceCore.ParseSlavery(s.Slavery);
+            if (stints.Count > 0)
+            {
+                t += "\n" + T(S_F_SLAVERY) + "\n";
+                foreach (var st in stints)
+                {
+                    if (st.EndDay == 0) t += TS(S_F_SLAVE_SINCE, st.Faction, N(st.StartDay)) + "\n";
+                    else if (st.EndDay == st.StartDay) t += TS(S_F_SLAVE_DAY, st.Faction, N(st.StartDay)) + "\n";
+                    else t += TS(S_F_SLAVE_SPAN, st.Faction, N(st.StartDay), N(st.EndDay)) + "\n";
+                }
+            }
+        }
         if (s.FfHits != 0)
         {
             t += "\n" + T(S_F_FF) + "\n";

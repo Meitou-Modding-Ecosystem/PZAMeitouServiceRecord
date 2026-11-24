@@ -113,6 +113,26 @@ public static class SrSave
         if (R("pza_ff_kos", out v)) { s.FfKOs = I(v); any = true; }
         if (R("pza_ff_limbs", out v)) { s.FfLimbs = I(v); any = true; }
         if (R("pza_ff_dmg", out v)) { s.FfDamage = v; any = true; }
+        if (R("pza_turret_dealt", out v)) { s.TurretDealt = v; any = true; }
+        if (R("pza_turret_kills", out v)) { s.TurretKills = I(v); any = true; }
+        if (R("pza_turret_kos", out v)) { s.TurretKOs = I(v); any = true; }
+        if (R("pza_turret_limbs", out v)) { s.TurretLimbs = I(v); any = true; }
+        if (R("pza_dmg_head", out v)) { s.DmgHead = v; any = true; }
+        if (R("pza_dmg_chest", out v)) { s.DmgChest = v; any = true; }
+        if (R("pza_dmg_stomach", out v)) { s.DmgStomach = v; any = true; }
+        if (R("pza_dmg_arms", out v)) { s.DmgArms = v; any = true; }
+        if (R("pza_dmg_legs", out v)) { s.DmgLegs = v; any = true; }
+        if (R("pza_dmg_human", out v)) { s.DmgHuman = v; any = true; }
+        if (R("pza_dmg_robot", out v)) { s.DmgRobot = v; any = true; }
+        if (R("pza_dmg_animal", out v)) { s.DmgAnimal = v; any = true; }
+        if (R("pza_kills_human", out v)) { s.KillsHuman = I(v); any = true; }
+        if (R("pza_kills_robot", out v)) { s.KillsRobot = I(v); any = true; }
+        if (R("pza_kills_animal", out v)) { s.KillsAnimal = I(v); any = true; }
+        if (str.TryGetValue("pza_slavery", out var sl) && sl.Length > 0)
+        {
+            s.Slavery = sl;
+            if (ServiceCore.SanitizeSlavery(sl).Length > 0) any = true;
+        }
 
         // One-time import of Kill Counter's numbers from THIS save (its STATS floats "kills", "kos", "limbs").
         if (ImportKc && !s.KcImported)
@@ -173,6 +193,14 @@ public static class SrSave
         s.TimesKO = C(s.TimesKO, "times KO"); s.LimbsLost = C(s.LimbsLost, "limbs lost"); s.Kills = C(s.Kills, "kills"); s.KosDealt = C(s.KosDealt, "KOs dealt");
         s.LimbsRemoved = C(s.LimbsRemoved, "limbs removed"); s.FfHits = C(s.FfHits, "ff hits"); s.FfKOs = C(s.FfKOs, "ff KOs"); s.FfLimbs = C(s.FfLimbs, "ff limbs");
         s.Fights = C(s.Fights, "fights");
+        s.TurretDealt = D(s.TurretDealt, "turret dealt");
+        s.TurretKills = C(s.TurretKills, "turret kills"); s.TurretKOs = C(s.TurretKOs, "turret KOs"); s.TurretLimbs = C(s.TurretLimbs, "turret limbs");
+        s.DmgHead = D(s.DmgHead, "part head"); s.DmgChest = D(s.DmgChest, "part chest"); s.DmgStomach = D(s.DmgStomach, "part stomach");
+        s.DmgArms = D(s.DmgArms, "part arms"); s.DmgLegs = D(s.DmgLegs, "part legs");
+        s.DmgHuman = D(s.DmgHuman, "target human"); s.DmgRobot = D(s.DmgRobot, "target robot"); s.DmgAnimal = D(s.DmgAnimal, "target animal");
+        s.KillsHuman = C(s.KillsHuman, "kills human"); s.KillsRobot = C(s.KillsRobot, "kills robot"); s.KillsAnimal = C(s.KillsAnimal, "kills animal");
+        string cleanSlavery = ServiceCore.SanitizeSlavery(s.Slavery);
+        if (cleanSlavery != s.Slavery) { s.Slavery = cleanSlavery; what.Add("slavery"); }
         if (s.Biggest > s.Dealt) { s.Biggest = (float)s.Dealt; what.Add("biggest above dealt"); }
         // the fight baseline is part of the record: never above it, never negative
         double bd = Math.Min(D(s.BDealt, "baseline"), s.Dealt);
@@ -220,7 +248,32 @@ public static class SrSave
             f["pza_ff_limbs"] = s.FfLimbs;
             f["pza_ff_dmg"] = (float)s.FfDamage;
         }
+        if (s.HasTurrets)
+        {
+            f["pza_turret_dealt"] = (float)s.TurretDealt;
+            f["pza_turret_kills"] = s.TurretKills;
+            f["pza_turret_kos"] = s.TurretKOs;
+            f["pza_turret_limbs"] = s.TurretLimbs;
+        }
+        if (s.HasPartDmg)
+        {
+            f["pza_dmg_head"] = (float)s.DmgHead;
+            f["pza_dmg_chest"] = (float)s.DmgChest;
+            f["pza_dmg_stomach"] = (float)s.DmgStomach;
+            f["pza_dmg_arms"] = (float)s.DmgArms;
+            f["pza_dmg_legs"] = (float)s.DmgLegs;
+        }
+        if (s.HasTargetBreakdown)
+        {
+            f["pza_dmg_human"] = (float)s.DmgHuman;
+            f["pza_dmg_robot"] = (float)s.DmgRobot;
+            f["pza_dmg_animal"] = (float)s.DmgAnimal;
+            f["pza_kills_human"] = s.KillsHuman;
+            f["pza_kills_robot"] = s.KillsRobot;
+            f["pza_kills_animal"] = s.KillsAnimal;
+        }
         str["pza_biggest_on"] = s.BiggestOn;
+        if (s.Slavery.Length > 0) str["pza_slavery"] = s.Slavery;
     }
 
     #endregion

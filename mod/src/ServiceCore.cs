@@ -5,8 +5,18 @@
 // offline (the C++ tests/test_core.cpp cases, and a differential replay against the C++ core).
 // Ids are plain numbers: the mod uses a character's slot and generation packed into one (CharacterKey), the C++ a Character*.
 using System.Globalization;
+using System.Text;
 
 namespace PZA.ServiceRecord.Meitou;
+
+/// <summary>Victim kind for combat breakdown (v0.13.0 / 0.1.8): flesh humanoids, skeletons (robots), animals.</summary>
+public static class TargetKind
+{
+    public const int Unknown = 0, Human = 1, Robot = 2, Animal = 3;
+}
+
+/// <summary>One enslavement spell (v0.13.0 / 0.1.8): EndDay == 0 means still enslaved.</summary>
+public readonly record struct SlaveryStint(string Faction, int StartDay, int EndDay);
 
 /// <summary>What we read from a character at one instant.</summary>
 public struct Snapshot
@@ -23,6 +33,22 @@ public struct Snapshot
     public float MinPct;
     /// <summary>Arms / legs that are stumps or crushed.</summary>
     public int Severed;
+    /// <summary>v0.13.0 / 0.1.8: sum of (flesh - stun) per body-part bucket (0 Head, 1 Chest, 2 Stomach, 3 Arms, 4 Legs).</summary>
+    public float Part0, Part1, Part2, Part3, Part4;
+
+    public readonly float Part(int i) => i switch { 0 => Part0, 1 => Part1, 2 => Part2, 3 => Part3, 4 => Part4, _ => 0 };
+
+    public void SetPart(int i, float v)
+    {
+        switch (i)
+        {
+            case 0: Part0 = v; break;
+            case 1: Part1 = v; break;
+            case 2: Part2 = v; break;
+            case 3: Part3 = v; break;
+            case 4: Part4 = v; break;
+        }
+    }
 }
 
 /// <summary>A character's record (saved with the character).</summary>
@@ -44,14 +70,41 @@ public sealed class Stats
     public int Fights;
     public double BDealt;
     public int BKills, BKOs, BLimbs, B1KO, B1Kill;
+    /// <summary>Turret combat (v0.13.0 / 0.1.8): tracked separately so turret gunners do not inflate combat totals, Merit, Rank or radar.</summary>
+    public double TurretDealt;
+    public int TurretKills, TurretKOs, TurretLimbs;
+    /// <summary>Combat damage dealt by body-part bucket (v0.13.0 / 0.1.8).</summary>
+    public double DmgHead, DmgChest, DmgStomach, DmgArms, DmgLegs;
+    /// <summary>Combat damage dealt and combat kills split by target kind (v0.13.0 / 0.1.8).</summary>
+    public double DmgHuman, DmgRobot, DmgAnimal;
+    public int KillsHuman, KillsRobot, KillsAnimal;
+    /// <summary>Slavery history (v0.13.0 / 0.1.8): semicolon-separated "&lt;Faction&gt;|&lt;startDay&gt;|&lt;endDay&gt;" (endDay 0 = still enslaved).</summary>
+    public string Slavery = "";
 
     public Stats Clone() => (Stats)MemberwiseClone();
+
+    public void AddPartDmg(int i, double d)
+    {
+        switch (i)
+        {
+            case 0: DmgHead += d; break;
+            case 1: DmgChest += d; break;
+            case 2: DmgStomach += d; break;
+            case 3: DmgArms += d; break;
+            case 4: DmgLegs += d; break;
+        }
+    }
+
+    public bool HasTurrets => TurretDealt > 0 || TurretKills > 0 || TurretKOs > 0 || TurretLimbs > 0;
+    public bool HasPartDmg => DmgHead > 0 || DmgChest > 0 || DmgStomach > 0 || DmgArms > 0 || DmgLegs > 0;
+    public bool HasTargetBreakdown => DmgHuman > 0 || DmgRobot > 0 || DmgAnimal > 0 || KillsHuman > 0 || KillsRobot > 0 || KillsAnimal > 0;
 
     /// <summary>The baseline = the record as it is now (a save from before fight counting).</summary>
     public void SetBaselineToNow() { BDealt = Dealt; BKills = Kills; BKOs = KosDealt; BLimbs = LimbsRemoved; B1KO = OneHitKO; B1Kill = OneHitKill; }
 
     public bool Empty => Dealt == 0 && Taken == 0 && Biggest == 0 && OneHitKO == 0 && OneHitKill == 0 && KosSuffered == 0 && TimesKO == 0 && LimbsLost == 0
-                         && Kills == 0 && KosDealt == 0 && LimbsRemoved == 0 && !KcImported && FfHits == 0 && Fights == 0;
+                         && Kills == 0 && KosDealt == 0 && LimbsRemoved == 0 && !KcImported && FfHits == 0 && Fights == 0
+                         && !HasTurrets && !HasPartDmg && !HasTargetBreakdown && Slavery.Length == 0;
 }
 
 public sealed class CoreConfig
@@ -81,6 +134,7 @@ public sealed class Counters
     public long BadReadings, CorpseCredits;
     public long FirstSeenDown, DiedOfWounds;
     public long FriendlyHits;
+    public long HitsTurret, TurretKills, TurretKOs, TurretLimbs, SlaveryStints;
 
     public void Reset()
     {
@@ -92,7 +146,8 @@ public sealed class Counters
         $"hits {Hits} (ranged {HitsRanged}, unreadable {Unreadable}, self {SelfHits}, corpse {CorpseHits}) dmgEvents {DamageEvents} zeroDrop {ZeroDrop} healDuringHit {HealDuringHit} | " +
         $"fresh {FreshHits} downings {Downings} freshDownings {FreshDownings} | 1hitKO {OneHitKO} 1hitKill {OneHitKill} koSuffered {KoSuffered} settledByHit {SettledByHit} settledUnloaded {SettledUnloaded} | " +
         $"timesKO {TimesKO} downThenDied {DownThenDied} limbsLost {LimbsLost} biggestUpd {BiggestUpdates} | kills {Kills} (no credit {KillsNoCredit}) kosDealt {KosDealt} (undone {KosUndone}, stealth {StealthKOs}) limbsRemoved {LimbsRemoved} | " +
-        $"unloadClears {UnloadClears} capRefused stats {StatsCapRefused} victims {VictimsCapRefused} pending {PendingCapRefused} track {TrackCapRefused} pruned {VictimsPruned} probeMiss {ProbeMiss} trackDropped {TrackDropped} | badReadings {BadReadings} corpseCredits {CorpseCredits} firstSeenDown {FirstSeenDown} diedOfWounds {DiedOfWounds} friendlyHits {FriendlyHits}");
+        $"unloadClears {UnloadClears} capRefused stats {StatsCapRefused} victims {VictimsCapRefused} pending {PendingCapRefused} track {TrackCapRefused} pruned {VictimsPruned} probeMiss {ProbeMiss} trackDropped {TrackDropped} | badReadings {BadReadings} corpseCredits {CorpseCredits} firstSeenDown {FirstSeenDown} diedOfWounds {DiedOfWounds} friendlyHits {FriendlyHits}" +
+        $" | turretHits {HitsTurret} turretKills {TurretKills} turretKOs {TurretKOs} turretLimbs {TurretLimbs} slavery {SlaveryStints}");
 }
 
 /// <summary>Fills <c>snapshot</c> with the character's current state; false if it is gone.</summary>
@@ -127,7 +182,8 @@ public sealed class ServiceCore
     sealed class Track
     {
         public ulong LastHitter, KoCreditor;
-        public bool Done;
+        public bool Done, LastTurret, KoTurret;
+        public int TargetKind;
         public double LastHitTime;
     }
 
@@ -201,7 +257,22 @@ public sealed class ServiceCore
         if (a is not null) { ++a.KosDealt; ++N.KosDealt; Ev("koDealt", attacker, victimId, 0); }
         var t = TrackOf(victimId);
         if (t is not null && t.Done) { ++N.CorpseCredits; return; }   // R2: a knockout on a corpse must not re-open its kill credit
-        if (t is not null) { t.LastHitter = attacker; t.KoCreditor = attacker; t.LastHitTime = _now; }
+        if (t is not null) { t.LastHitter = attacker; t.KoCreditor = attacker; t.LastTurret = false; t.KoTurret = false; t.TargetKind = TargetKind.Unknown; t.LastHitTime = _now; }
+    }
+
+    /// <summary>Slavery status poll for a character (v0.13.0 / 0.1.8): opens / transfers / closes stints by in-game Day.</summary>
+    public void OnSlavery(ulong who, bool isSlave, string faction, int day)
+    {
+        if (who == 0) return;
+        if (!isSlave)
+        {
+            if (!_stats.TryGetValue(who, out var existing) || existing.Slavery.Length == 0) return;
+            RecordSlavery(existing, false, faction, day);
+            return;
+        }
+        var s = Get(who);
+        if (s is null) return;
+        if (RecordSlavery(s, true, faction, day)) ++N.SlaveryStints;
     }
 
     /// <summary>Judges a downing. died = confirmed dead inside the settle window with no other hit in between; otherwise a knockout.</summary>
@@ -267,12 +338,14 @@ public sealed class ServiceCore
     }
 
     /// <summary>A hit landed: <paramref name="before"/> just before the game applied it, <paramref name="after"/> just after. attacker 0 = unknown.
-    /// friendly = the attacker counted the victim as an ally at the moment of the hit.</summary>
-    public void OnHit(ulong attacker, ulong victimId, Snapshot before, Snapshot after, double now, string victimName, bool ranged, bool friendly = false)
+    /// friendly = the attacker counted the victim as an ally at the moment of the hit. turret = mounted turret shot (tracked separately).</summary>
+    public void OnHit(ulong attacker, ulong victimId, Snapshot before, Snapshot after, double now, string victimName, bool ranged, bool friendly = false,
+        bool turret = false, int targetKind = TargetKind.Unknown)
     {
         ++N.Hits;
         if (now > _now) _now = now;
         if (ranged) ++N.HitsRanged;
+        if (turret) ++N.HitsTurret;
         if (victimId == 0) return;
         if (attacker == victimId) { ++N.SelfHits; attacker = 0; }
         if (!before.Valid || !after.Valid) { ++N.Unreadable; return; }
@@ -323,26 +396,47 @@ public sealed class ServiceCore
             Ev("friendlyFire", attacker, victimId, drop);
             attacker = 0;
         }
-        // Kill Counter's three tracks
-        if (attacker != 0)
+        // v0.13.0 / 0.1.8: turret hits stay separate from personal combat (never inflate dealt, kills, Merit, Rank or radar)
+        if (attacker != 0 && turret)
         {
+            var aS = Get(attacker);
+            if (aS is not null) aS.TurretDealt += drop;
+            if (lost > 0 && aS is not null) { aS.TurretLimbs += lost; N.TurretLimbs += lost; Ev("limbRemoved", attacker, victimId, lost); }
+            var t = TrackOf(victimId);
+            if (t is not null && !t.Done) { t.LastHitter = attacker; t.LastHitTime = now; t.LastTurret = true; t.TargetKind = targetKind; }
+            if (!before.Down && after.Down)
+            {
+                if (aS is not null) { ++aS.TurretKOs; ++N.TurretKOs; Ev("koDealt", attacker, victimId, 0); }
+                if (t is not null) { t.KoCreditor = attacker; t.KoTurret = true; }
+            }
+        }
+        else if (attacker != 0)
+        {
+            // Kill Counter's three tracks
             var aS = Get(attacker);
             if (lost > 0 && aS is not null) { aS.LimbsRemoved += lost; N.LimbsRemoved += lost; Ev("limbRemoved", attacker, victimId, lost); }
             var t = TrackOf(victimId);
-            if (t is not null && !t.Done) { t.LastHitter = attacker; t.LastHitTime = now; }
+            if (t is not null && !t.Done) { t.LastHitter = attacker; t.LastHitTime = now; t.LastTurret = false; t.TargetKind = targetKind; }
             if (!before.Down && after.Down)
             {
                 if (aS is not null) { ++aS.KosDealt; ++N.KosDealt; Ev("koDealt", attacker, victimId, 0); }
-                if (t is not null) t.KoCreditor = attacker;
+                if (t is not null) { t.KoCreditor = attacker; t.KoTurret = false; }
             }
-        }
-        if (attacker != 0)
-        {
-            var aS = Get(attacker);
             if (aS is not null)
             {
                 aS.Dealt += drop;
                 if (drop > aS.Biggest) { aS.Biggest = drop; aS.BiggestOn = victimName; ++N.BiggestUpdates; Ev("biggest", attacker, victimId, drop); }
+                for (int i = 0; i < 5; i++)
+                {
+                    float pd = before.Part(i) - after.Part(i);
+                    if (!float.IsNaN(pd) && pd > 0 && pd < 1e6f) aS.AddPartDmg(i, pd);
+                }
+                if (drop > 0)
+                {
+                    if (targetKind == TargetKind.Human) aS.DmgHuman += drop;
+                    else if (targetKind == TargetKind.Robot) aS.DmgRobot += drop;
+                    else if (targetKind == TargetKind.Animal) aS.DmgAnimal += drop;
+                }
             }
         }
 
@@ -351,7 +445,7 @@ public sealed class ServiceCore
             ++N.Downings;
             if (fresh) ++N.FreshDownings;
             if (_pending.Count >= Cfg.MaxPending) ++N.PendingCapRefused;
-            else _pending[victimId] = new Pending { Attacker = attacker, T0 = now, Fresh = fresh, Friendly = ffDowning };
+            else _pending[victimId] = new Pending { Attacker = turret ? 0 : attacker, T0 = now, Fresh = fresh, Friendly = ffDowning };
         }
 
         if (v is not null) v.LastHit = now;
@@ -383,9 +477,24 @@ public sealed class ServiceCore
             if (Cfg.KillCreditWindow > 0 && now - tr.LastHitTime > Cfg.KillCreditWindow)
             { ++N.DiedOfWounds; Ev("diedOfWounds", tr.LastHitter, victimId, (float)(now - tr.LastHitTime)); continue; }
             var k = Get(tr.LastHitter);
-            if (k is not null) { ++k.Kills; ++N.Kills; Ev("kill", tr.LastHitter, victimId, 0); }
+            if (k is not null)
+            {
+                if (tr.LastTurret) { ++k.TurretKills; ++N.TurretKills; }
+                else
+                {
+                    ++k.Kills; ++N.Kills;
+                    if (tr.TargetKind == TargetKind.Human) ++k.KillsHuman;
+                    else if (tr.TargetKind == TargetKind.Robot) ++k.KillsRobot;
+                    else if (tr.TargetKind == TargetKind.Animal) ++k.KillsAnimal;
+                }
+                Ev("kill", tr.LastHitter, victimId, 0);
+            }
             // the same character knocked it out and killed it while down: one event, a kill (Kill Counter's KO undo)
-            if (k is not null && tr.LastHitter == tr.KoCreditor && s.Down && k.KosDealt > 0) { --k.KosDealt; ++N.KosUndone; }
+            if (k is not null && tr.LastHitter == tr.KoCreditor && s.Down)
+            {
+                if (tr.KoTurret && k.TurretKOs > 0) { --k.TurretKOs; ++N.KosUndone; }
+                else if (!tr.KoTurret && k.KosDealt > 0) { --k.KosDealt; ++N.KosUndone; }
+            }
         }
 
         // 2. Poll tracked characters for knockouts from any cause.
@@ -467,4 +576,136 @@ public sealed class ServiceCore
     }
 
     public static string Triple(double a, double b, double c) => Short(a) + "/" + Short(b) + "/" + Short(c);
+
+    #region Slavery history (v0.13.0 / 0.1.8, byte-for-byte with C++)
+
+    public static string SanitizeSlaveryFaction(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "Unknown";
+        var bytes = Encoding.UTF8.GetBytes(raw);
+        var clean = new List<byte>(Math.Min(bytes.Length, 48));
+        foreach (byte c in bytes)
+        {
+            if (c < 0x20 || c == 0x7F || c == (byte)'|' || c == (byte)';') continue;
+            clean.Add(c);
+        }
+        int a = 0;
+        while (a < clean.Count && clean[a] == (byte)' ') a++;
+        int b = clean.Count;
+        while (b > a && clean[b - 1] == (byte)' ') b--;
+        int len = b - a;
+        if (len <= 0) return "Unknown";
+        if (len > 48)
+        {
+            int cut = 48;
+            while (cut > 0 && (clean[a + cut] & 0xC0) == 0x80) cut--;
+            while (cut > 0 && clean[a + cut - 1] == (byte)' ') cut--;
+            len = cut;
+        }
+        if (len <= 0) return "Unknown";
+        return Encoding.UTF8.GetString(clean.GetRange(a, len).ToArray());
+    }
+
+    static bool ParseSlaveryInt(ReadOnlySpan<char> s, out int value)
+    {
+        value = 0;
+        if (s.Length == 0 || s.Length > 8) return false;
+        long v = 0;
+        foreach (char c in s)
+        {
+            if (c < '0' || c > '9') return false;
+            v = v * 10 + (c - '0');
+            if (v > 10_000_000) return false;
+        }
+        value = (int)v;
+        return true;
+    }
+
+    public static List<SlaveryStint> ParseSlavery(string? raw)
+    {
+        var list = new List<SlaveryStint>();
+        if (string.IsNullOrEmpty(raw)) return list;
+        int p = 0, scanned = 0;
+        while (p < raw.Length && scanned < 256)
+        {
+            ++scanned;
+            int q = raw.IndexOf(';', p);
+            if (q < 0) q = raw.Length;
+            var item = raw.AsSpan(p, q - p);
+            p = q + 1;
+            int bar1 = item.IndexOf('|');
+            if (bar1 < 0) continue;
+            var rest = item[(bar1 + 1)..];
+            int bar2Rel = rest.IndexOf('|');
+            if (bar2Rel < 0 || rest[(bar2Rel + 1)..].IndexOf('|') >= 0) continue;
+            if (!ParseSlaveryInt(rest[..bar2Rel], out int sd)) continue;
+            if (!ParseSlaveryInt(rest[(bar2Rel + 1)..], out int ed)) continue;
+            if (sd < 1 || (ed != 0 && ed < sd)) continue;
+            if (list.Count >= 20) list.RemoveAt(0);
+            list.Add(new SlaveryStint(SanitizeSlaveryFaction(item[..bar1].ToString()), sd, ed));
+        }
+        return list;
+    }
+
+    public static string FormatSlavery(IReadOnlyList<SlaveryStint> list)
+    {
+        var parts = new List<string>();
+        int start = list.Count > 20 ? list.Count - 20 : 0;
+        for (int i = start; i < list.Count; i++)
+        {
+            var st = list[i];
+            if (st.StartDay < 1 || st.StartDay > 10_000_000) continue;
+            if (st.EndDay < 0 || st.EndDay > 10_000_000 || (st.EndDay != 0 && st.EndDay < st.StartDay)) continue;
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{SanitizeSlaveryFaction(st.Faction)}|{st.StartDay}|{st.EndDay}"));
+        }
+        while (parts.Count > 0)
+        {
+            int bytes = 0;
+            for (int i = 0; i < parts.Count; i++) bytes += Encoding.UTF8.GetByteCount(parts[i]) + (i > 0 ? 1 : 0);
+            if (bytes <= 400) break;
+            parts.RemoveAt(0);
+        }
+        return string.Join(';', parts);
+    }
+
+    public static string SanitizeSlavery(string? raw) => FormatSlavery(ParseSlavery(raw));
+
+    public static bool RecordSlavery(Stats s, bool isSlave, string? faction, int day)
+    {
+        if (day < 1) day = 1;
+        if (day > 10_000_000) day = 10_000_000;
+        var list = s.Slavery.Length > 0 ? ParseSlavery(s.Slavery) : [];
+        bool opened = false;
+        if (!isSlave)
+        {
+            if (list.Count > 0 && list[^1].EndDay == 0)
+            {
+                var last = list[^1];
+                list[^1] = last with { EndDay = day < last.StartDay ? last.StartDay : day };
+                s.Slavery = FormatSlavery(list);
+            }
+            return false;
+        }
+        string fn = SanitizeSlaveryFaction(faction);
+        if (list.Count == 0 || list[^1].EndDay != 0)
+        {
+            list.Add(new SlaveryStint(fn, day, 0));
+            opened = true;
+        }
+        else
+        {
+            var cur = list[^1];
+            if (cur.Faction == "Unknown" && fn != "Unknown") list[^1] = cur with { Faction = fn };
+            else if (fn != "Unknown" && fn != cur.Faction)
+            {
+                list[^1] = cur with { EndDay = day < cur.StartDay ? cur.StartDay : day };
+                list.Add(new SlaveryStint(fn, day, 0));
+                opened = true;
+            }
+        }
+        s.Slavery = FormatSlavery(list);
+        return opened;
+    }
+
+    #endregion
 }

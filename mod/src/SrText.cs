@@ -90,6 +90,21 @@ public static class SrText
     public const string S_F_FF_HITS = "fighter.ff_hits";
     public const string S_F_FF_KOS = "fighter.ff_kos";
     public const string S_F_FF_DAMAGE = "fighter.ff_damage";
+    public const string S_F_BY_PART = "fighter.by_part";
+    public const string S_F_PART_HEAD = "fighter.part_head";
+    public const string S_F_PART_CHEST = "fighter.part_chest";
+    public const string S_F_PART_STOMACH = "fighter.part_stomach";
+    public const string S_F_PART_ARMS = "fighter.part_arms";
+    public const string S_F_PART_LEGS = "fighter.part_legs";
+    public const string S_F_BY_TARGET = "fighter.by_target";
+    public const string S_F_TGT_HUMAN = "fighter.tgt_human";
+    public const string S_F_TGT_ROBOT = "fighter.tgt_robot";
+    public const string S_F_TGT_ANIMAL = "fighter.tgt_animal";
+    public const string S_F_TURRETS = "fighter.turrets";
+    public const string S_F_SLAVERY = "fighter.slavery";
+    public const string S_F_SLAVE_SPAN = "fighter.slave_span";
+    public const string S_F_SLAVE_DAY = "fighter.slave_day";
+    public const string S_F_SLAVE_SINCE = "fighter.slave_since";
     public const string S_F_KC = "fighter.kc";
     public const string S_TIMES_ONE = "count.times.one";
     public const string S_TIMES_FEW = "count.times.few";
@@ -389,6 +404,21 @@ public static class SrText
         (S_F_FF_HITS, "Hits on own side: {1}"),
         (S_F_FF_KOS, "Knockouts: {1}   Limbs: {2}"),
         (S_F_FF_DAMAGE, "Damage to allies: {1}"),
+        (S_F_BY_PART, "DAMAGE BY PART"),
+        (S_F_PART_HEAD, "Head: {1}"),
+        (S_F_PART_CHEST, "Chest: {1}"),
+        (S_F_PART_STOMACH, "Stomach: {1}"),
+        (S_F_PART_ARMS, "Arms: {1}"),
+        (S_F_PART_LEGS, "Legs: {1}"),
+        (S_F_BY_TARGET, "BY TARGET"),
+        (S_F_TGT_HUMAN, "Humans: {1} dmg, {2} kills"),
+        (S_F_TGT_ROBOT, "Skeletons: {1} dmg, {2} kills"),
+        (S_F_TGT_ANIMAL, "Animals: {1} dmg, {2} kills"),
+        (S_F_TURRETS, "TURRETS"),
+        (S_F_SLAVERY, "SLAVERY"),
+        (S_F_SLAVE_SPAN, "Slave of {1}, Day {2} to {3}"),
+        (S_F_SLAVE_DAY, "Slave of {1}, Day {2}"),
+        (S_F_SLAVE_SINCE, "Slave of {1}, since Day {2}"),
         (S_F_KC, "Includes numbers imported once from Kill Counter."),
         (S_TIMES_ONE, "{1} time"),
         (S_TIMES_FEW, "{1} times"),
@@ -583,7 +613,7 @@ public static class SrText
         (S_HELP_SQUAD, "Squad: your squad as a table, best first; animals' names are ^alavender^n. The Sort button changes the column: kills, knockouts, damage dealt, biggest hit, damage taken, friendly fire."),
         (S_HELP_RECENT, "Recent: this session's knockouts, kills, limbs and friendly fire involving your people, in the order they happened (the latest on the last page). Friendly fire shows in ^ggreen^n."),
         (S_HELP_REPORTS, "Reports: an After-Action Report for each battle, written when the fight ends (30 seconds without a blow): who opened it, who held the line, who carried it, friendly fire, and what happened after. Back and Next step through the battles; the Advice button shows or hides a Sustain / Improve section in every report (off by default)."),
-        (S_HELP_RANKS, "RANK (earned): every fighter earns a rank from their own record, shown by name on the Fighter page. Merit = kills x 3 + knockouts dealt x 2 + limbs taken x 2 + fights counted + damage dealt / 250; friendly fire earns nothing. The ranks: Recruit (0), Scrapper (10), Blade (30), Veteran (70), Blooded (140), Hardened (260), Champion (450), Legend (750). A rank changes nothing in the game."),
+        (S_HELP_RANKS, "RANK (earned): every fighter earns a rank from their own record, shown by name on the Fighter page. Merit = kills x 3 + knockouts dealt x 2 + limbs taken x 2 + fights counted + damage dealt / 250; friendly fire and turret hits earn nothing (turrets are tracked separately). The ranks: Recruit (0), Scrapper (10), Blade (30), Veteran (70), Blooded (140), Hardened (260), Champion (450), Legend (750). A rank changes nothing in the game."),
         (S_HELP_COMMAND, "CHAIN OF COMMAND: posts and who leads whom are set in the PZA Military Manager window, which comes with Service Record: press Shift+M. It has its own help page. The Fighter page shows a fighter's post, the Squad page shows it after the name."),
         (S_HELP_ARCHIVE, "Kept reports: this window shows the battles of this session only, but every report is also kept in a text file, one per faction, in %LOCALAPPDATA%\\kenshi\\PZAServiceRecord\\reports (each starts with the save it was written in). Report numbers carry on from the last kept report. A report is about 3 KB. PZAServiceRecord.ini: ReportArchive=0 turns this off; ReportArchiveMaxMB (50) caps the folder, and at the cap nothing more is written."),
         (S_HELP_TIMES, "Times: \"1:23\" is the time since you loaded the game, at the game's speed (paused time doesn't count); a battle's length and when each person went down use it. Next to it, in brackets, Kenshi's own clock: \"1:23 (07:41)\". Each report's title has the Day it happened, and its first lines say \"In game: Day 413, 07:40 to 07:52\". The Recent page shows both: \"[1:23 | Day 413, 07:41]\". If the Day is one off from the game's own, change GameDayOffset in PZAServiceRecord.ini."),

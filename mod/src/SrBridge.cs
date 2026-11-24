@@ -10,10 +10,12 @@
 // Members are looked up by name (internal types); a miss switches that part off with a line naming it, never a crash.
 using System.Reflection;
 using HarmonyLib;
+using Meitou.Data.Gameplay.Bodies;
 using Meitou.Data.Save;
 using Meitou.Simulation;
 using Meitou.Simulation.Bodies;
 using Meitou.Simulation.Dialogue;
+using Meitou.Simulation.Factions;
 
 namespace PZA.ServiceRecord.Meitou;
 
@@ -26,8 +28,29 @@ public static class SrBridge
 
     public static CharacterId IdOf(ulong key) => key == 0 ? CharacterId.None : new((int)(key >> 32) - 1, (int)(uint)key);
 
+    static int PartBucket(HealthPart p) => p.Template.Type switch
+    {
+        BodyPartType.Head => 0,
+        BodyPartType.Arm => 3,
+        BodyPartType.Leg => 4,
+        _ => (p.Template.Name.Contains("stomach", StringComparison.OrdinalIgnoreCase)
+              || p.Template.Name.Contains("gut", StringComparison.OrdinalIgnoreCase)
+              || p.Template.Name.Contains("abdomen", StringComparison.OrdinalIgnoreCase)
+              || p.Template.StringId.Contains("284-gamedata.base", StringComparison.OrdinalIgnoreCase)
+              || p.Template.StringId.Contains("stomach", StringComparison.OrdinalIgnoreCase)) ? 2 : 1,
+    };
+
+    /// <summary>Victim kind for combat breakdown (v0.13.0 / 0.1.8): 1 human, 2 robot, 3 animal, 0 unknown.</summary>
+    public static int TargetKindOf(CharacterCold? c)
+    {
+        if (c is null) return TargetKind.Unknown;
+        if (c.Animal is not null || SquadRegistry.IsAnimal(c)) return TargetKind.Animal;
+        if (c.Race?.IsRobot == true) return TargetKind.Robot;
+        return TargetKind.Human;
+    }
+
     /// <summary>The plugin's ReadSnap: down = unconscious or dead; health = sum of (flesh - stun); minPct = the lowest part's health fraction;
-    /// severed = arms / legs that are stumps or crushed.</summary>
+    /// severed = arms / legs that are stumps or crushed; Part0..Part4 = per-bucket (flesh - stun).</summary>
     public static Snapshot Read(CharacterCold? c)
     {
         if (c?.Medical is not { } m || m.Parts.Count <= 0) return default;
@@ -38,7 +61,10 @@ public static class SrBridge
         for (int i = 0; i < n; i++)
         {
             var p = m.Parts[i];
-            sum += p.Flesh - p.Stun;
+            float hp = p.Flesh - p.Stun;
+            sum += hp;
+            int b = PartBucket(p);
+            s.SetPart(b, s.Part(b) + hp);
             if (p.Fraction < mn) mn = p.Fraction;
         }
         s.Health = sum;
@@ -64,8 +90,8 @@ public static class SrBridge
     {
         public int Victim = -1, Attacker = -1;
         public Snapshot Snap;
-        public bool Friendly;
-        public int VictimLeader = -1;
+        public bool Friendly, Turret;
+        public int VictimLeader = -1, TargetKind;
         public long Tick = -1;
     }
 
@@ -81,17 +107,20 @@ public static class SrBridge
         return b;
     }
 
-    static void Bracket(World world, int attacker, int victim)
+    static void Bracket(World world, int attacker, int victim, bool turret = false)
     {
         if (!SrSystem.Active || victim < 0) return;
         var table = world.Characters;
+        var victimCold = table.Cold(victim);
         var b = t_before ??= new Before();
         b.Victim = victim;
         b.Attacker = attacker;
         b.Tick = world.Tick;
-        b.Snap = Read(table.Cold(victim));
+        b.Snap = Read(victimCold);
         b.Friendly = attacker >= 0 && attacker != victim && IsAlly(world, attacker, victim);
+        b.Turret = turret;
         b.VictimLeader = IsLeader(world, victim);
+        b.TargetKind = TargetKindOf(victimCold);
     }
 
     /// <summary>The plugin's isAlly(attacker, victim): Meitou's "A regards B as friendly" (DialogueSystem.RegardsFriendly, the original's
@@ -175,11 +204,25 @@ public static class SrBridge
 
     static void LandBlowPrefix(World world, in Effect e) => Bracket(world, e.Source, e.Target);
 
-    static void BoltHitPrefix(World world, int v, object[] __args)
+    static void BoltHitPrefix(object __instance, World world, int v, object[] __args)
     {
         int shooter = -1;
-        if (__args.Length > 1 && __args[1] is { } p && s_shooter?.GetValue(p) is int s) shooter = s;
-        Bracket(world, shooter, v);
+        bool turret = false;
+        if (__args.Length > 1 && __args[1] is { } p)
+        {
+            if (s_shooter?.GetValue(p) is int s) shooter = s;
+            if (s_turret is not null) turret = s_turret.GetValue(p) is true;
+            else if (s_turretManning is not null && s_manning is not null && shooter >= 0 && world.Characters.Cold(shooter) is { } sc)
+            {
+                try
+                {
+                    if (s_turretManning.GetValue(__instance) is { } tm)
+                        turret = s_manning.Invoke(tm, [world, shooter, sc]) is not null;
+                }
+                catch { }
+            }
+        }
+        Bracket(world, shooter, v, turret);
     }
 
     static void ExecutePrefix(World world, int a, int d) => Bracket(world, a, d);
@@ -246,7 +289,8 @@ public static class SrBridge
 
     #region Install
 
-    static FieldInfo? s_shooter;
+    static FieldInfo? s_shooter, s_turret, s_turretManning;
+    static MethodInfo? s_manning;
     static PropertyInfo? s_entries, s_partsStats, s_partsSource;
 
     /// <summary>Resolves and patches; returns the lines to log (each part that is missing says so and stays off).</summary>
@@ -259,7 +303,12 @@ public static class SrBridge
         var capture = sim.GetType("Meitou.Simulation.Saving.SaveCapture");
         var parts = sim.GetType("Meitou.Simulation.Saving.SavedParts");
         var characters = sim.GetType("Meitou.Simulation.Saving.SavedCharacters");   // Read / Again live here (0.20.1), returning a SavedParts
-        s_shooter = sim.GetType("Meitou.Simulation.Combat.Projectile")?.GetField("Shooter");
+        var projectile = sim.GetType("Meitou.Simulation.Combat.Projectile");
+        s_shooter = projectile?.GetField("Shooter");
+        s_turret = projectile?.GetField("Turret");
+        s_turretManning = combat?.GetField("_turretManning", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        s_manning = s_turretManning?.FieldType.GetMethod("Manning", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+            [typeof(World), typeof(int), typeof(CharacterCold)]);
         s_entries = sim.GetType("Meitou.Simulation.Carrying.KnockoutLog")?.GetProperty("Entries");
         s_partsStats = parts?.GetProperty("Stats");
         s_partsSource = parts?.GetProperty("Source");
@@ -272,6 +321,9 @@ public static class SrBridge
         Patch(h, lines, characters, "Read", nameof(ReadPostfix), prefix: false, needs: s_partsStats);
         Patch(h, lines, characters, "Again", nameof(ReadPostfix), prefix: false, needs: s_partsStats);
         if (s_shooter is null) lines.Add("Projectile.Shooter not found: ranged hits carry no attacker");
+        if (s_turret is not null) lines.Add("turret test: Projectile.Turret");
+        else if (s_turretManning is not null && s_manning is not null) lines.Add("turret test: CombatSystem._turretManning.Manning(World, Int32, CharacterCold)");
+        else lines.Add("turret test not found: turret shots count as normal ranged");
         FindRegardsFriendly();
         lines.Add("ally test: " + AllyTest);
         return lines;

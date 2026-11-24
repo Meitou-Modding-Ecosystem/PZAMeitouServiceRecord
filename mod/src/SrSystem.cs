@@ -51,6 +51,8 @@ public sealed class SrSystem : ICombatHitObserver
         ulong a = SrBridge.Key(hit.Attacker), v = SrBridge.Key(hit.Victim);
         bool ranged = hit.Source == CombatHitSource.Projectile;
         bool friendly = b?.Friendly ?? false;
+        bool turret = ranged && (b?.Turret ?? false);
+        int targetKind = b is not null ? b.TargetKind : SrBridge.TargetKindOf(victimCold);
         double now = world.Tick / TicksPerSecond;
         if (now > s_now) s_now = now;
 
@@ -59,7 +61,7 @@ public sealed class SrSystem : ICombatHitObserver
             EnsureLoaded(a, attackerCold);
             EnsureLoaded(v, victimCold);
             long down0 = Core.N.Downings, fresh0 = Core.N.FreshDownings;
-            Core.OnHit(a, v, before, after, s_now, vname, ranged, friendly);
+            Core.OnHit(a, v, before, after, s_now, vname, ranged, friendly, turret, targetKind);
             Hang(a, attackerCold);
             Hang(v, victimCold);
             int purpose = ranged ? (hit.Intended ? 1 : 0) : -1;   // the plugin: iShotYou's "on purpose" flag; Meitou: the shot's own target
@@ -208,9 +210,34 @@ public sealed class SrSystem : ICombatHitObserver
             Core.OnFrame(s_now, (ulong who, out Snapshot s) => Probe(world, who, out s));
             foreach (ulong key in Core.TrackedIds()) Hang(key, SrBridge.Cold(world, SrBridge.IdOf(key)));
             SrReports.Tick(world, s_now);
-            if (world.Tick % 60 == 0) SrWindow.TakeSquad(world);   // every 2 s, for the window's pages
+            if (world.Tick % 60 == 0)
+            {
+                PollSlavery(world);
+                SrWindow.TakeSquad(world);   // every 2 s, for the window's pages
+            }
         }
         LogCounters(false);
+    }
+
+    /// <summary>Polls player characters' slavery state every 2 s (v0.13.0 / 0.1.8, under Lock).</summary>
+    static void PollSlavery(World world)
+    {
+        if (world.GameHours < 0) return;
+        int day = (int)Aar.GameClock.Day(world.GameHours);
+        var table = world.Characters;
+        var prev = table.Previous;
+        for (int slot = 0; slot < prev.Length; slot++)
+        {
+            if (!prev[slot].Alive) continue;
+            var c = table.Cold(slot);
+            if (c is null || !c.IsPlayer) continue;
+            bool isSlave = c.SlaveState == 1;
+            ulong key = SrBridge.Key(table.IdOf(slot));
+            if (isSlave || SrSave.Of(c.Stats) is not null) EnsureLoaded(key, c);
+            string owner = isSlave && c.SlaveOwner >= 0 ? SrReports.FactionName(world, c.SlaveOwner) : "";
+            Core.OnSlavery(key, isSlave, owner, day);
+            if (Core.Find(key) is not null) Hang(key, c);
+        }
     }
 
     static bool Probe(World world, ulong who, out Snapshot s)

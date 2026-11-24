@@ -2,7 +2,7 @@
   // PZA's Service Record for Meitou (author PZA, GPLv3 or later). Schema: MeitouClient docs/modding.md "Discovery", docs/modding-dependencies.md "Manifest".
   // The folder can be the RE_Kenshi plugin's own (mods\PZAServiceRecord\): Meitou loads only the assembly listed here, RE_Kenshi only RE_Kenshi.json's.
   "id": "pza.servicerecord",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "apiVersion": 2,
   "assemblies": ["PZAServiceRecord.Meitou.dll"],
   "entry": "PZA.ServiceRecord.Meitou.ServiceRecordMod",
